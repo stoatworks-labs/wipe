@@ -321,8 +321,10 @@ modulation on (the most arithmetic per pixel):
 
 As genlock found, a tenth of a millisecond is close to what a `glFinish`
 round trip costs to observe; take the ceiling, not the mean. The Area-law
-solve, on the CPU, per frame in which something changed: under 0.03 ms for
-any single pattern, 2.8 ms for a box at Multiple 8×8, 7.8 ms for a circle.
+solve, on the CPU, per frame in which something changed: under 0.06 ms for
+any single pattern, 2.8 ms for a box at Multiple 8×8 and 7.8 ms for a circle on
+a quiet machine — 6.9 and 16.9 ms in a verify run taken while seven other
+plugin builds were loading the CPU. Take the ceiling.
 
 **Assumed, or not yet done:**
 

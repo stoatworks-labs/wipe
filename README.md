@@ -154,7 +154,7 @@ M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 | No dead controls | all **21** sweepable of the 25 parameters change the picture; the other four are the About buttons |
 | macOS binary | universal (`x86_64 arm64`), exports `plugMain`, ad-hoc signs |
 | Host metadata | `oxbow probe` reads **SW Wipe / WP01 / mixer / inputs 2..2** |
-| Render cost | **0.03 ms/frame at 720p, 0.04 at 1080p, 0.12 at 4K** (0.7% of a 60 fps frame), worst of several runs. Area law adds a CPU solve on the frames where something changed: under 0.03 ms for any single pattern, **2.8 ms for a box at Multiple 8×8 and 7.8 ms for a circle** |
+| Render cost | **0.03 ms/frame at 720p, 0.04 at 1080p, 0.12 at 4K** (0.7% of a 60 fps frame), worst of several runs. Area law adds a CPU solve on the frames where something changed: under 0.06 ms for any single pattern, **2.8 ms for a box at Multiple 8×8 and 7.8 ms for a circle** on a quiet machine (6.9 and 16.9 with other builds loading the CPU) |
 
 Run `tools/verify.sh` before believing any of it.
 
