@@ -62,7 +62,9 @@ So every pattern in the menu is a formula in those two ramps, H and V:
   them at N times the line rate.
 
 **It is a mixer, not an effect.** It needs a layer below it: that layer is A,
-and the clip on this layer is B, which the fader wipes in.
+and the clip on this layer is B, which the fader wipes in. The
+[user guide](docs/USER-GUIDE.md) covers installing it, picking it as a layer's
+Blend Mode, and every control.
 
 ## The controls
 
@@ -186,9 +188,10 @@ is still open, and nobody has looked at a mixer's picture inside Resolume. The
 because there is no remote. Nothing has run on a **rasteriser other than this
 Mac's**. The spec's `Size` control was dropped, for a stated reason. Area law
 with both Multiples high is the one setting whose CPU cost is worth knowing
-about. There are **no presets**, no OpenFX port, no browser demo and no user
-guide — which is why the About block deliberately carries no guide link.
-`StoatworksAbout.h` and `ATTRIBUTIONS.md` are provisional hand copies.
+about. There are **no presets**, no OpenFX port and no browser demo. The
+[user guide](docs/USER-GUIDE.md) is written, but the About block carries no
+guide button yet: it is a provisional hand copy (as is `ATTRIBUTIONS.md`), and
+the button arrives when registration regenerates it.
 
 [AGENTS.md](AGENTS.md) has the full list of what is assumed rather than
 measured, the open questions, and the traps.

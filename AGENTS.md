@@ -400,7 +400,11 @@ plugin builds were loading the CPU. Take the ceiling.
 - **Area law with modulation on** is the area of the unmodulated waveform;
   the sine's mean over a non-integer number of periods is not accounted for.
 - **No OpenFX port and no browser demo.** Neither is required for 0.1.0.
-- **No user guide**, which is why the About block carries no guide link.
+- **The About block has no User guide button**, although `docs/USER-GUIDE.md`
+  now exists. Decided without asking: the About headers are generated from the
+  website's projects.json and must not be hand-edited here, so the button
+  arrives when the release registers the project and regenerates them. The
+  guide's About section describes the three buttons that exist today.
 - `StoatworksAbout.h` and `ATTRIBUTIONS.md` are provisional hand copies.
 
 ---

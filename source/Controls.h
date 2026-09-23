@@ -75,8 +75,9 @@ float BorderSoftnessPxFromParam( float value );
 /// 0 to 360 degrees, in radians. Rotates the waveform generator's frame.
 float RotationRadiansFromParam( float value );
 
-/// 0.25 to 4, geometrically, with 0.5 as unity. Stretches the pattern
-/// horizontally: the aspect knob beside a real positioner.
+/// 0.25 to 4, geometrically, with 0.5 as unity. Multiplies the pattern's
+/// horizontal coordinate, so above unity the pattern is NARROWER (a tall box)
+/// and below it wider: the aspect knob beside a real positioner.
 float AspectFromParam( float value );
 
 /// 0 to 64 output pixels, linear, on the horizontal ramp. The modulator's

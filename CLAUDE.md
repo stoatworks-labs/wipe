@@ -107,7 +107,8 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
 - No release tag, no remote, not registered on the website. `StoatworksAbout.h`
   and `ATTRIBUTIONS.md` are provisional hand copies.
 - No `Size` control (dropped, see AGENTS.md), no presets, no OpenFX port, no
-  browser demo, no user guide.
+  browser demo. `docs/USER-GUIDE.md` exists; the About block has no guide
+  button until registration regenerates it.
 
 ## Diagnostics
 
