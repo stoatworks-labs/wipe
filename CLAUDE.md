@@ -27,7 +27,7 @@ of how an FFGL mixer behaves) before touching `ProcessOpenGL`.
 
 ## Verify
 - Everything: `tools/verify.sh` (fresh universal build + every check, ~1 min)
-- No name over 16 characters: `./build/wptest --names`
+- No name over 16 characters, and parameter 0 is Aspect Comp: `./build/wptest --names`
 - Two inputs, two sizes, two MaxUVs, and the guards: `./build/wptest --mixer`
 - Position 0 IS A and 1 IS B, every pattern, bitwise: `./build/wptest --ends`
 - The edge where Edge law puts it, circle vs ellipse: `./build/wptest --edge`
@@ -76,6 +76,11 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
 - `wipe_core` is an OBJECT library, not STATIC — the plugin registers itself
   from a file-scope constructor nothing references by name.
 - macOS build must be universal. Verify with `lipo`, never the build log.
+- **Parameter 0 is sacrificial.** Resolume Arena does not expose a mixer's
+  first parameter (measured on genlock: its id 0 is missing from the panel and
+  the REST JSON). So index 0 is `Aspect Comp`, whose default (on) is right if it
+  can never be reached. Never put a control a mixer needs there. `--names` and
+  `verify.sh`'s oxbow step assert it; only Arena can confirm which one it hides.
 - FFGL id is `WP01`. Display name `SW Wipe`.
 
 ## Not done yet

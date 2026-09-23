@@ -264,6 +264,22 @@ rely on the binding. If one session in Arena shows it binds, renaming is a
 one-line change and the transition control drives the wipe, which is the
 right behaviour for a mixer.
 
+**Index 0 is deliberately sacrificial: `Aspect Comp` sits there.** Resolume
+Arena 7.27.1 does not expose a mixer's first parameter — measured on genlock,
+whose Key Source (id 0) is absent from Arena's mixer panel and REST JSON and so
+is stuck at its default. Why is not known. Wipe was built with `Pattern` at
+index 0, which in Resolume would have left every wipe a horizontal one. So the
+parameter at index 0 must be one whose default is the right value if nobody
+can ever change it: `Aspect Comp`, on, which keeps a circle round and a box
+square — the ellipse it turns off is a curiosity, not a working setting. It
+moved from the end of the Pattern group to the front; every other control
+kept its relative order, and the IDs were renumbered, which is harmless for a
+plugin that had never been released (nothing persisted them). `wptest --names`
+and `verify.sh`'s oxbow step assert the declaration. **Arena must confirm
+which parameter it hides**: both checks read what the plugin declares, and the
+declaration was right on genlock too. If Arena turns out to hide something
+other than id 0, the fix is still only what is declared first.
+
 **Reverse mirrors W within its range**, `wMin + wMax − W`, rather than
 swapping A and B: a reversed box *closes* on A rather than opening on B, and a
 reversed ramp runs from the other side, which is what the switch did.

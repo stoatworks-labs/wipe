@@ -767,7 +767,17 @@ int runNames()
 		}
 	}
 	std::printf( "\n  %d over the limit\n", over );
-	return over == 0 ? 0 : 1;
+
+	//Index 0 is sacrificial: Resolume Arena does not expose a mixer's first
+	//parameter (measured on genlock), so it must be a control whose default
+	//is right for ever. This checks the declaration; only Arena can say
+	//which parameter it actually hides.
+	const char* first  = plugin.GetParamName( 0 );
+	const bool firstOk = first != nullptr && std::strcmp( first, "Aspect Comp" ) == 0
+	                     && plugin.GetParamType( 0 ) == FF_TYPE_BOOLEAN && plugin.GetFloatParameter( 0 ) == 1.0f;
+	std::printf( "  %s  parameter 0, which Arena hides, is %s (boolean, default on)\n", firstOk ? "ok  " : "FAIL",
+	             first ? first : "(none)" );
+	return over == 0 && firstOk ? 0 : 1;
 }
 
 //---------------------------------------------------------------------------

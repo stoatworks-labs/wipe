@@ -66,10 +66,11 @@ Wipe::Wipe()
 	// Defaults. SetParamInfof reads each one back out of GetFloatParameter,
 	// so these assignments are what the host is told the defaults are.
 	//---------------------------------------------------------------------
+	//Index 0, which Arena hides: on is the value it must hold for ever.
+	params[ PT_ASPECT_COMP ] = 1.0f;
 	params[ PT_PATTERN ]     = static_cast< float >( PAT_HORIZONTAL );
 	params[ PT_REVERSE ]     = 0.0f;
 	params[ PT_FLIPFLOP ]    = 0.0f;
-	params[ PT_ASPECT_COMP ] = 1.0f;
 
 	//Half way, so a mixer dropped on a layer shows what it does at once.
 	params[ PT_POSITION ] = 0.5f;
@@ -109,10 +110,13 @@ Wipe::Wipe()
 		SetParamInfo( first + 2, ( base + " Blue" ).c_str(), FF_TYPE_BLUE, params[ first + 2 ] );
 	};
 
+	//FIRST, deliberately: Resolume Arena does not expose a mixer's parameter
+	//0 (measured on genlock), so it holds a control whose default is right
+	//if it can never be changed. See Wipe.h.
+	SetParamInfo( PT_ASPECT_COMP, "Aspect Comp", FF_TYPE_BOOLEAN, true );
 	option( PT_PATTERN, "Pattern", PAT_COUNT, kPatternNames );
 	SetParamInfo( PT_REVERSE, "Reverse", FF_TYPE_BOOLEAN, false );
 	SetParamInfo( PT_FLIPFLOP, "Flip-Flop", FF_TYPE_BOOLEAN, false );
-	SetParamInfo( PT_ASPECT_COMP, "Aspect Comp", FF_TYPE_BOOLEAN, true );
 
 	//Named Position, not Opacity. The SDK's Add example says Resolume looks
 	//for a parameter named Opacity for the mix value; genlock recorded that
@@ -142,7 +146,7 @@ Wipe::Wipe()
 	SetParamRange( PT_MULT_V, 1.0f, static_cast< float >( kMultipleMax ) );
 
 	// Groups, the way Resolume shows them: each group one contiguous run.
-	for( FFUInt32 i = PT_PATTERN; i <= PT_ASPECT_COMP; ++i )
+	for( FFUInt32 i = PT_ASPECT_COMP; i <= PT_FLIPFLOP; ++i )
 		SetParamGroup( i, "Pattern" );
 	for( FFUInt32 i = PT_POSITION; i <= PT_LAW; ++i )
 		SetParamGroup( i, "Fader" );

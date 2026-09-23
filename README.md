@@ -65,8 +65,11 @@ and the clip on this layer is B, which the fader wipes in.
 
 ## The controls
 
-**Pattern** — Pattern, Reverse, Flip-Flop (reverse on alternate transitions:
-A box-wipes in, then B box-wipes in), Aspect Comp.
+**Pattern** — Aspect Comp, Pattern, Reverse, Flip-Flop (reverse on alternate
+transitions: A box-wipes in, then B box-wipes in). Aspect Comp is first on
+purpose: Resolume Arena does not show a mixer's first parameter (measured on
+genlock), so index 0 holds the one control whose default — on, a round circle —
+is right if nobody can ever reach it.
 
 **Fader** — Position, and Law. *Edge* is what the hardware did: the level is
 linear in the fader. *Area* chooses the level so that the B area is exactly

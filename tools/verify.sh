@@ -239,6 +239,14 @@ if [ "$(uname)" = "Darwin" ] && [ -d "$BUNDLE" ]; then
 			*"inputs:      2..2"*) pass "the host is told to give it two inputs" ;;
 			*) fail "wrong input count -- SetMinInputs/SetMaxInputs are separate from the type" ;;
 		esac
+		# Arena does not expose a mixer's parameter 0 (measured on genlock), so
+		# index 0 is sacrificial and must be a control whose default is right
+		# for ever. This reads the declaration; only Arena can say which one it
+		# hides.
+		case "$out" in
+			*"[ 0] Aspect Comp "*) pass "parameter 0, which Arena hides, is Aspect Comp" ;;
+			*) fail "parameter 0 is not Aspect Comp -- Arena hides a mixer's first parameter" ;;
+		esac
 	else
 		printf '   skipped: oxbow not built at %s\n' "$OXBOW"
 	fi

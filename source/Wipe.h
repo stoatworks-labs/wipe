@@ -94,13 +94,23 @@ public:
 	}
 
 	/// In the order the host shows them.
+	///
+	/// **Index 0 is sacrificial.** Resolume Arena 7.27.1 does not expose a
+	/// mixer's FIRST parameter at all -- measured on genlock, whose Key Source
+	/// (id 0) is missing from Arena's mixer panel and REST JSON, so it is stuck
+	/// at its default. Whatever sits here must therefore be a control whose
+	/// default is the right value if nobody can ever reach it: Aspect Comp,
+	/// on, which keeps a circle round. Moving it here from the end of the
+	/// Pattern group is the only reordering; everything else keeps its
+	/// relative order. Arena, not the harness, must confirm which parameter
+	/// it hides -- both the harness and oxbow read the declaration.
 	enum ParamID : FFUInt32
 	{
 		//Pattern
+		PT_ASPECT_COMP,
 		PT_PATTERN,
 		PT_REVERSE,
 		PT_FLIPFLOP,
-		PT_ASPECT_COMP,
 
 		//Fader
 		PT_POSITION,
