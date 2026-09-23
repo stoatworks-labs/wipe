@@ -161,7 +161,7 @@ M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 | Edge law, whole pixel | a hard edge at column p·W: B left, A right, **0 pixels wrong** at three columns |
 | Edge law, fractional | a soft edge at 160.5, 320.25, 480.75 px recovered by integration to **0.0000 px** (tolerance 0.02) |
 | Circle vs ellipse | Aspect Comp on: eight radii agree to **0.0007 px**; off: axes in the ratio **1.7778** of the picture's 1.7778, diagonal within 0.001 px of the ellipse |
-| Area law | every pattern's B area within **0.33 px of area** of the fader (continuous, 4× supersampled); the corner-free patterns also within **0.68 px** summed over the displayed pixels |
+| Area law | every pattern's B area within **0.33 px of area** of the fader (continuous, 4× supersampled); the corner-free patterns also within **0.68 px** summed over the displayed pixels. Tolerance 1 px plus the GL spec's 1 part in 10^5 of the picture coordinate; on Apple's software renderer the worst is 1.50 px of 3.40 |
 | Softness | horizontal 10–90% width **12.8000 px** of 12.8; on the circle **41.855 / 23.449 / 14.318 px** at three radii, each the parabola's closed form to 0.001 |
 | Border | **12 red columns** from column 320, contiguous; soft, the red integrates to **12.0000 px**; on the circle 31.801 and 14.938 px at two radii against 31.800 and 14.938 |
 | Modulation | amplitude **16.0000 px** of 16, RMS residual from a sine **0.0000 px**, and a quarter second at 1 Hz moves the phase by exactly −π/2 |
@@ -198,12 +198,14 @@ either platform. That Arena hands a mixer both inputs **padded** and calls
 `SetTime` **every frame, in milliseconds** (so the modulator will travel) was
 measured on genlock and not re-checked on Wipe. Whether a layer transition or
 the autopilot moves `Opacity`, and whether Arena ever calls a mixer with one
-input, are still open. CI runs on GitHub: the Windows DLL compiles with MSVC,
-and on the GPU-less macOS runner eight of the nine suites pass, but `--area`
-fails at 640×360 on four patterns (Vertical, Box, Box reversed, Clock:
-1.04–1.50 px of continuous area off the fader against a one-pixel tolerance,
-while the displayed area is within 0.5 px and every pattern passes at
-320×180), so that job is red. Nothing has run on a **GPU other than this
+input, are still open. CI runs on GitHub and is green: the Windows DLL compiles with MSVC,
+and on the GPU-less macOS runner all nine suites and the control sweep pass on
+Apple's software renderer. `--area` failed there at first — the software
+renderer interpolates picture coordinates only to the GL spec's 1 part in
+10^5, which is 2.3 px of area on a 640×360 vertical wipe, and the check had
+allowed one pixel. The check was wrong, not the plugin; its tolerance now
+includes that allowance, and `tools/verify.sh` runs every suite on the same
+software renderer locally. Nothing has run on a **GPU other than this
 Mac's**. The spec's `Size` control was dropped, for a stated reason.
 Area law with both Multiples high is the one setting whose CPU cost is worth
 knowing about. There are **no presets**, no OpenFX port and no browser demo.

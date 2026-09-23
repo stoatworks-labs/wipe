@@ -191,6 +191,9 @@ why 320×180 (one pixel = 1.7e-5 of the picture) passed. The check now adds
 that allowance, read off the key by the co-area formula (see "Every number"),
 with a negative control that every tolerance stays under a quarter-pixel shift
 of its own edge. The plugin was never wrong, and nothing in `source/` changed.
+CI went green on the commit that made the change (dd445f2, run 35926715895):
+all nine suites, and the control sweep, which the red `--area` had kept from
+ever running (21 swept, 0 dead).
 (Computing `uv` from `gl_FragCoord` would dodge the interpolator, but it is
 still a GL float result under the same spec clause, and a plugin change needs
 a release.)
