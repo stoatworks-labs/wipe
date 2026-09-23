@@ -3,8 +3,8 @@ name: release
 # Build the Wipe FFGL plugin for the two platforms Resolume runs on:
 #   - macOS   -> universal (arm64 + x86_64) Wipe.bundle
 #   - Windows -> x64 Wipe.dll (GLEW static-linked via vcpkg)
-# Each ships as a zip. This one is a MIXER, not an effect, so it goes in
-# Resolume's "Extra Mixers" folder rather than "Extra Effects".
+# Each ships as a zip. This one is a MIXER, not an effect, but it still goes
+# in Resolume's "Extra Effects" folder: Resolume has no other FFGL folder.
 # Trigger manually (Actions > release > Run workflow) or by pushing a
 # v* tag.
 #
@@ -127,7 +127,7 @@ jobs:
         shell: bash
         # A .dmg, but deliberately NOT a .pkg. An FFGL plugin's destination is
         # per-user and edition-specific -- the README installs to
-        # ~/Documents/Resolume {Arena,Avenue}/Extra Mixers -- so a .pkg would
+        # ~/Documents/Resolume {Arena,Avenue}/Extra Effects -- so a .pkg would
         # have to guess a path and would silently install to the wrong one for
         # half of users.
         run: |

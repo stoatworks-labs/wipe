@@ -201,6 +201,14 @@ bindings clearing rather than restoring; `StoatworksAboutParams.h` needing the
 SDK first; the OBJECT library; the 0..1 clamp on STANDARD defaults; the
 synthetic clock; the same-second make.
 
+**There is no `Extra Mixers`.** Until v0.1.0 the install prefix, the README,
+CLAUDE.md and the release workflow all sent the bundle to
+`~/Documents/Resolume Arena/Extra Mixers`, inherited from genlock's assumption
+that Resolume keeps mixers in a folder of their own. It does not: genlock was
+loaded by Resolume Arena 7.27.1 (Windows, 2026-09-23) out of **Extra Effects**
+and offered as a layer **Blend Mode**, and the Arena binary names no other FFGL
+folder. An install to Extra Mixers installs nothing Arena sees.
+
 ---
 
 ## Shape of the code
@@ -328,8 +336,7 @@ plugin builds were loading the CPU. Take the ceiling.
 
 **Assumed, or not yet done:**
 
-- **Never loaded into Resolume.** Not once. Every host claim — Extra Mixers,
-  the `Opacity` binding, one-input calls while patching, whether a mixer gets
+- **Never loaded into Resolume.** Not once. Every host claim — the `Opacity` binding, one-input calls while patching, whether a mixer gets
   `SetTime` (the modulator's travel needs it) — is inherited from genlock's
   list of unknowns, not measured.
 - **Never run on another rasteriser.** The tolerances are derived and the

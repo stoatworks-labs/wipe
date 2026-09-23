@@ -129,11 +129,14 @@ wipe_add_plugin(Wipe source/PluginEntry.cpp
 # `cmake --install build` drops the bundle where Arena reads it. Avenue reads
 # ~/Documents/Resolume Avenue/Extra Effects instead; pass --prefix for that.
 #
-# A MIXER is not an effect. genlock assumed Resolume reads mixers from "Extra
-# Mixers" beside Extra Effects; this repo inherits that assumption, untested:
-# nothing here has been in front of Resolume.
+# A mixer goes in Extra Effects like every other FFGL plugin. This said
+# "Extra Mixers" until v0.1.0, inherited from genlock's assumption that
+# Resolume keeps mixers apart; it does not. Measured on genlock in Resolume
+# Arena 7.27.1 (2026-09-23): Arena scans Extra Effects, loads the mixer from
+# there and offers it as a layer Blend Mode, and its binary names no "Extra
+# Mixers" anywhere. An install to Extra Mixers would install nothing Arena sees.
 if(APPLE AND CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/Documents/Resolume Arena/Extra Mixers"
+    set(CMAKE_INSTALL_PREFIX "$ENV{HOME}/Documents/Resolume Arena/Extra Effects"
         CACHE PATH "" FORCE)
 endif()
 install(TARGETS Wipe

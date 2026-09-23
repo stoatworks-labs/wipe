@@ -96,14 +96,17 @@ git clone --recursive https://github.com/stoatworks-labs/wipe
 cd wipe
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-cmake --install build    # → ~/Documents/Resolume Arena/Extra Mixers
+cmake --install build    # → ~/Documents/Resolume Arena/Extra Effects
 ```
 
 macOS builds universal (arm64 + x86_64) by default. Add
 `-DCMAKE_OSX_ARCHITECTURES=arm64` for a faster development build.
 
-The install path is **Extra Mixers**, not Extra Effects. That is genlock's
-assumption about how Resolume separates the two, inherited here, and untested.
+The install path is **Extra Effects**, although this is a mixer. Resolume has one
+FFGL folder, and sources, effects and mixers all load from it: genlock, the
+fleet's first mixer, was loaded from there by Resolume Arena 7.27.1 and offered
+as a layer Blend Mode. (Before v0.1.0 this said `Extra Mixers`, which Arena never
+reads.)
 
 ## Building and testing
 

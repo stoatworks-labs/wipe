@@ -40,7 +40,7 @@ std::string logPath();
 /// loaded, not the place the build put it and not the place the installer was
 /// told to use.
 ///
-/// It is the only way to answer "did Resolume read this out of Extra Mixers?"
+/// It is the only way to answer "which copy did Resolume load, from which folder?"
 /// from inside the plugin, and it is written at LOAD time rather than at
 /// instantiation -- a host that scans the folder, reads the plugin's name and
 /// then never offers it to the operator leaves a log with this line and
