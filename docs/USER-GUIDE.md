@@ -246,8 +246,14 @@ second. The default is a quarter of the way along, 1 cycle a second. At 0 it
 stands still. It runs on Resolume's clock, which Arena sends to a mixer every
 frame (measured on Genlock).
 
-**Multiple H** and **Multiple V**: repeat the pattern, from 1 to 8 times across
-(H) and up (V). The default is 1 of each. A Horizontal wipe uses Multiple H only
+**Multiple H** and **Multiple V**: run the waveforms 1 to 8 times over, so the
+pattern repeats in cells. The default is 1 of each. Multiple V counts copies up
+the picture. Multiple H counts copies across one picture *height's* worth of
+width whenever Aspect Comp is on (the default, and the only setting Resolume can
+reach), because the horizontal ramp is scaled for the picture's shape before it
+wraps: that keeps the cells square, so on a 16:9 picture Multiple H of 4 gives
+about seven copies across. With Aspect Comp off it is exactly N across, and a
+circle's cells are stretched with the picture. A Horizontal wipe uses Multiple H only
 and a Vertical wipe Multiple V only; a Box, Diamond or Circle is repeated in a
 grid, each copy opening in its own cell; a Clock with Multiple H of N sweeps N
 sectors at once; the Matrix multiplies its 32 × 18 grid by both.
