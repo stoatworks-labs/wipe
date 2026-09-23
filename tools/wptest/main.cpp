@@ -12,7 +12,7 @@
         wptest --list                   every parameter, for the sweep
         wptest --names                  no name over FFGL's 16 characters
         wptest --mixer                  two inputs, two MaxUVs, and the guards
-        wptest --ends                   Position 0 IS A and 1 IS B, every pattern
+        wptest --ends                   Opacity 0 IS A and 1 IS B, every pattern
         wptest --edge                   the edge sits where Edge law says
         wptest --area                   the B area IS the fader, in Area law
         wptest --softness               the edge width follows the waveform's slope
@@ -530,11 +530,11 @@ struct Rig
 	/// transition looks like to the flip-flop. Starts by resting at 0.
 	bool Transitions( int count )
 	{
-		if( !Set( "Position", 0.0f ) || !Render( 0 ) )
+		if( !Set( "Opacity", 0.0f ) || !Render( 0 ) )
 			return false;
 		for( int i = 0; i < count; ++i )
 		{
-			if( !Set( "Position", ( i % 2 == 0 ) ? 1.0f : 0.0f ) || !Render( 0 ) )
+			if( !Set( "Opacity", ( i % 2 == 0 ) ? 1.0f : 0.0f ) || !Render( 0 ) )
 				return false;
 		}
 		return true;
@@ -835,7 +835,7 @@ int runMixer()
 		const Side& side = sides[ mid ? 0 : pass ];
 		rig.Set( "Pattern", 0.0f );
 		rig.Set( "Softness", 0.0f );
-		rig.Set( "Position", mid ? 0.5f : side.position );
+		rig.Set( "Opacity", mid ? 0.5f : side.position );
 		if( !rig.Render( 0 ) )
 		{
 			Check( false, std::string( side.name ) + ": ProcessOpenGL failed" );
@@ -898,7 +898,7 @@ int runMixer()
 }
 
 //---------------------------------------------------------------------------
-// --ends: Position 0 IS A and Position 1 IS B, bitwise, on every pattern,
+// --ends: Opacity 0 IS A and Opacity 1 IS B, bitwise, on every pattern,
 // with everything that could leak into an end stop switched on.
 //---------------------------------------------------------------------------
 int runEnds()
@@ -929,15 +929,15 @@ int runEnds()
 		for( int pattern = 0; pattern < PAT_COUNT; ++pattern )
 		{
 			rig.Set( "Pattern", static_cast< float >( pattern ) );
-			rig.Set( "Position", 0.0f );
+			rig.Set( "Opacity", 0.0f );
 			if( !rig.Render( 0 ) )
 				return 1;
 			const int atA = maxByteDifference( rig.Pixels(), aCard );
-			rig.Set( "Position", 1.0f );
+			rig.Set( "Opacity", 1.0f );
 			if( !rig.Render( 0 ) )
 				return 1;
 			const int atB = maxByteDifference( rig.Pixels(), bCard );
-			rig.Set( "Position", 0.5f );
+			rig.Set( "Opacity", 0.5f );
 			if( !rig.Render( 0 ) )
 				return 1;
 			const Image mid = rig.Pixels();
@@ -971,7 +971,7 @@ int runEdge()
 			const int columns[ 3 ] = { W / 4, W / 2, 3 * W / 4 };
 			for( int col : columns )
 			{
-				rig.Set( "Position", static_cast< float >( col ) / W );
+				rig.Set( "Opacity", static_cast< float >( col ) / W );
 				if( !rig.Render( 0 ) )
 					return 1;
 				const Image out = rig.Pixels();
@@ -1006,7 +1006,7 @@ int runEdge()
 			Check( bound * 3.0 <= tol, fmt( "the float bound %.2e px is at least 3x inside the tolerance %.2f px", bound, tol ) );
 			for( double edge : edges )
 			{
-				rig.Set( "Position", static_cast< float >( edge / W ) );
+				rig.Set( "Opacity", static_cast< float >( edge / W ) );
 				if( !rig.Render( 0 ) )
 					return 1;
 				const ImageF out = rig.PixelsF();
@@ -1031,7 +1031,7 @@ int runEdge()
 			rig.Set( "Centre X", centreOnPixel( W ) );
 			rig.Set( "Centre Y", centreOnPixel( H ) );
 			const double p = 0.1;
-			rig.Set( "Position", static_cast< float >( p ) );
+			rig.Set( "Opacity", static_cast< float >( p ) );
 			const int cx = W / 2, cy = H / 2;
 			const int dirs[ 8 ][ 2 ] = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { -1, 1 }, { 1, -1 }, { -1, -1 } };
 
@@ -1153,7 +1153,7 @@ int runArea()
 				double worst         = 0.0;
 				for( double p : c.positions )
 				{
-					use.Set( "Position", static_cast< float >( p ) );
+					use.Set( "Opacity", static_cast< float >( p ) );
 					if( !use.Render( 0 ) )
 						return 1;
 					const double area = imageSum( use.PixelsF(), use.width, use.height ) * useArea;
@@ -1173,7 +1173,7 @@ int runArea()
 		plainRig( rig );
 		rig.Set( "Pattern", static_cast< float >( PAT_BOX ) );
 		rig.Set( "Softness", PxParamFor( 8.0 ) );
-		rig.Set( "Position", 0.5f );
+		rig.Set( "Opacity", 0.5f );
 		if( !rig.Render( 0 ) )
 			return 1;
 		const double edgeArea = imageSum( rig.PixelsF(), W, H ) * pixelArea;
@@ -1202,7 +1202,7 @@ int runSoftness()
 		plainRig( rig );
 		const double softPx = 16.0;
 		rig.Set( "Softness", PxParamFor( softPx ) );
-		rig.Set( "Position", 0.5f );
+		rig.Set( "Opacity", 0.5f );
 		if( !rig.Render( 0 ) )
 			return 1;
 		{
@@ -1238,7 +1238,7 @@ int runSoftness()
 		double widths[ 3 ], r50[ 3 ], predicted[ 3 ], local[ 3 ];
 		for( int i = 0; i < 3; ++i )
 		{
-			rig.Set( "Position", static_cast< float >( levels[ i ] ) );
+			rig.Set( "Opacity", static_cast< float >( levels[ i ] ) );
 			if( !rig.Render( 0 ) )
 				return 1;
 			const ImageF out = rig.PixelsF();
@@ -1291,7 +1291,7 @@ int runBorder()
 		rig.Set( "Border Width", PxParamFor( borderPx ) );
 
 		//---------------- horizontal, hard: exactly 12 red columns
-		rig.Set( "Position", 0.5f );
+		rig.Set( "Opacity", 0.5f );
 		if( !rig.Render( 0 ) )
 			return 1;
 		{
@@ -1330,7 +1330,7 @@ int runBorder()
 		double widths[ 2 ], want[ 2 ], local[ 2 ], rin[ 2 ];
 		for( int i = 0; i < 2; ++i )
 		{
-			rig.Set( "Position", static_cast< float >( levels[ i ] ) );
+			rig.Set( "Opacity", static_cast< float >( levels[ i ] ) );
 			if( !rig.Render( 0 ) )
 				return 1;
 			const ImageF out = rig.PixelsF();
@@ -1382,7 +1382,7 @@ int runModulation()
 		const double ampPx  = 16.0;
 		const double cycles = 4.0;//Mod Frequency 0.5 is exactly 0.5 * 64^0.5
 		rig.Set( "Softness", PxParamFor( 8.0 ) );
-		rig.Set( "Position", 0.5f );
+		rig.Set( "Opacity", 0.5f );
 		rig.Set( "Mod Amount", PxParamFor( ampPx ) );
 		rig.Set( "Mod Frequency", 0.5f );
 		rig.Set( "Mod Speed", 0.25f );//1 Hz
@@ -1461,7 +1461,7 @@ int runFlipFlop()
 		return 1;
 	plainRig( rig );
 	rig.Set( "Pattern", static_cast< float >( PAT_BOX ) );
-	rig.Set( "Position", 0.5f );
+	rig.Set( "Opacity", 0.5f );
 	if( !rig.Render( 0 ) )
 		return 1;
 	const Image opening = rig.Pixels();
@@ -1476,7 +1476,7 @@ int runFlipFlop()
 	//Resting at 0 first: the first arrival at an end is not a transition.
 	if( !rig.Transitions( 0 ) )
 		return 1;
-	rig.Set( "Position", 0.5f );
+	rig.Set( "Opacity", 0.5f );
 	if( !rig.Render( 0 ) )
 		return 1;
 	Check( maxByteDifference( rig.Pixels(), opening ) == 0, "before any transition the box opens" );
@@ -1484,10 +1484,10 @@ int runFlipFlop()
 
 	for( int t = 1; t <= 4; ++t )
 	{
-		rig.Set( "Position", ( t % 2 == 1 ) ? 1.0f : 0.0f );
+		rig.Set( "Opacity", ( t % 2 == 1 ) ? 1.0f : 0.0f );
 		if( !rig.Render( 0 ) )
 			return 1;
-		rig.Set( "Position", 0.5f );
+		rig.Set( "Opacity", 0.5f );
 		if( !rig.Render( 0 ) )
 			return 1;
 		const bool flipped = ( t % 2 ) == 1;
@@ -1495,10 +1495,10 @@ int runFlipFlop()
 		       fmt( "after transition %.0f the box ", t ) + ( flipped ? "closes" : "opens" ) + ", bitwise" );
 	}
 	rig.Set( "Flip-Flop", 0.0f );
-	rig.Set( "Position", 1.0f );
+	rig.Set( "Opacity", 1.0f );
 	if( !rig.Render( 0 ) )
 		return 1;
-	rig.Set( "Position", 0.5f );
+	rig.Set( "Opacity", 0.5f );
 	if( !rig.Render( 0 ) )
 		return 1;
 	Check( maxByteDifference( rig.Pixels(), opening ) == 0, "with Flip-Flop off a transition changes nothing" );
@@ -1519,7 +1519,7 @@ double benchAt( int width, int height, int frames, double fps )
 	rig.Set( "Softness", 0.3f );
 	rig.Set( "Border Width", 0.2f );
 	rig.Set( "Mod Amount", 0.2f );
-	rig.Set( "Position", 0.5f );
+	rig.Set( "Opacity", 0.5f );
 	const int warmup = 20;
 	for( int frame = 0; frame < warmup; ++frame )
 		rig.Render( frame, fps );
@@ -1603,7 +1603,7 @@ void usage()
 		"  --list            print every parameter, its kind, default and range, then exit\n"
 		"  --names           no parameter or element name over 16 characters\n"
 		"  --mixer           two inputs, two MaxUVs, and the missing-input guards\n"
-		"  --ends            Position 0 IS A and 1 IS B, on every pattern\n"
+		"  --ends            Opacity 0 IS A and 1 IS B, on every pattern\n"
 		"  --edge            the edge sits where Edge law says; circle vs ellipse\n"
 		"  --area            the B area IS the fader in Area law, every pattern\n"
 		"  --softness        the edge width follows the waveform's slope\n"
@@ -1738,7 +1738,7 @@ int main( int argc, char** argv )
 		rig.UploadA( generate( inputA, width, height ) );
 		rig.UploadB( generate( inputB, width, height ) );
 
-		float position = rig.plugin.GetFloatParameter( Wipe::PT_POSITION );
+		float position = rig.plugin.GetFloatParameter( Wipe::PT_OPACITY );
 		for( const std::string& setting : settings )
 		{
 			const size_t equals = setting.find( '=' );
@@ -1748,7 +1748,7 @@ int main( int argc, char** argv )
 				std::fprintf( stderr, "--set %s: expected Name=Value with a known name (try --list)\n", setting.c_str() );
 				return 2;
 			}
-			if( setting.substr( 0, equals ) == "Position" )
+			if( setting.substr( 0, equals ) == "Opacity" )
 				position = std::strtof( setting.substr( equals + 1 ).c_str(), nullptr );
 		}
 		if( transitions > 0 )
@@ -1758,7 +1758,7 @@ int main( int argc, char** argv )
 				std::fprintf( stderr, "ProcessOpenGL failed during the transitions\n" );
 				return 1;
 			}
-			rig.Set( "Position", position );
+			rig.Set( "Opacity", position );
 		}
 
 		if( !rig.RenderFrames( frames, fps ) )

@@ -72,8 +72,9 @@ Wipe::Wipe()
 	params[ PT_REVERSE ]     = 0.0f;
 	params[ PT_FLIPFLOP ]    = 0.0f;
 
-	//Half way, so a mixer dropped on a layer shows what it does at once.
-	params[ PT_POSITION ] = 0.5f;
+	//Half way, so a mixer dropped on a layer shows what it does at once. In
+	//Resolume the layer's opacity fader overrides it from the first frame.
+	params[ PT_OPACITY ] = 0.5f;
 	params[ PT_LAW ]      = static_cast< float >( LAW_EDGE );
 
 	params[ PT_SOFTNESS ]     = 0.0f;
@@ -118,11 +119,12 @@ Wipe::Wipe()
 	SetParamInfo( PT_REVERSE, "Reverse", FF_TYPE_BOOLEAN, false );
 	SetParamInfo( PT_FLIPFLOP, "Flip-Flop", FF_TYPE_BOOLEAN, false );
 
-	//Named Position, not Opacity. The SDK's Add example says Resolume looks
-	//for a parameter named Opacity for the mix value; genlock recorded that
-	//as unverified, so this plugin does not rely on it. Renaming is one line
-	//once a session in front of Arena has answered the question.
-	SetParamInfof( PT_POSITION, "Position", FF_TYPE_STANDARD );
+	//Named Opacity, not Position, and the name is load-bearing: Resolume
+	//binds a mixer parameter called Opacity to the LAYER's opacity fader
+	//(measured on genlock in Arena 7.27.1 -- writes to the mixer's own
+	//Opacity are overridden and never reach the plugin). So the layer's
+	//fader drives the wipe: 0 is A, the layer below, and 1 is B, this layer.
+	SetParamInfof( PT_OPACITY, "Opacity", FF_TYPE_STANDARD );
 	option( PT_LAW, "Law", LAW_COUNT, kLawNames );
 
 	SetParamInfof( PT_SOFTNESS, "Softness", FF_TYPE_STANDARD );
@@ -148,7 +150,7 @@ Wipe::Wipe()
 	// Groups, the way Resolume shows them: each group one contiguous run.
 	for( FFUInt32 i = PT_ASPECT_COMP; i <= PT_FLIPFLOP; ++i )
 		SetParamGroup( i, "Pattern" );
-	for( FFUInt32 i = PT_POSITION; i <= PT_LAW; ++i )
+	for( FFUInt32 i = PT_OPACITY; i <= PT_LAW; ++i )
 		SetParamGroup( i, "Fader" );
 	for( FFUInt32 i = PT_SOFTNESS; i <= PT_BORDER_B; ++i )
 		SetParamGroup( i, "Edge" );
@@ -232,7 +234,7 @@ FFResult Wipe::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	// The fader, and the flip-flop. A transition is an arrival at one end
 	// from the other; each one flips the direction while Flip-Flop is on.
 	//-----------------------------------------------------------------
-	const double position = std::clamp( static_cast< double >( params[ PT_POSITION ] ), 0.0, 1.0 );
+	const double position = std::clamp( static_cast< double >( params[ PT_OPACITY ] ), 0.0, 1.0 );
 	const bool flipflop   = params[ PT_FLIPFLOP ] > 0.5f;
 	if( position >= 1.0 )
 	{

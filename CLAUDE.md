@@ -19,7 +19,7 @@ of how an FFGL mixer behaves) before touching `ProcessOpenGL`.
 - Choose the two inputs: `--input-a video --input-b graphic`
   (a is **A**, the layer below; b is **B**, this layer, wiped in. Also
   `quads-a`, `quads-b`, `black`, `white`, `flat`.)
-- Set anything by name: `--set "Pattern=4" --set "Position=0.3" --set "Softness=0.25"`
+- Set anything by name: `--set "Pattern=4" --set "Opacity=0.3" --set "Softness=0.25"`
   (options by index: Pattern 0..6 = Horizontal, Vertical, Box, Diamond, Circle,
   Clock, Matrix; Law 0 Edge, 1 Area)
 - Drive the fader to alternate ends first: `--transitions N` (for Flip-Flop)
@@ -29,7 +29,7 @@ of how an FFGL mixer behaves) before touching `ProcessOpenGL`.
 - Everything: `tools/verify.sh` (fresh universal build + every check, ~1 min)
 - No name over 16 characters, and parameter 0 is Aspect Comp: `./build/wptest --names`
 - Two inputs, two sizes, two MaxUVs, and the guards: `./build/wptest --mixer`
-- Position 0 IS A and 1 IS B, every pattern, bitwise: `./build/wptest --ends`
+- Opacity 0 IS A and 1 IS B, every pattern, bitwise: `./build/wptest --ends`
 - The edge where Edge law puts it, circle vs ellipse: `./build/wptest --edge`
 - The B area where Area law puts it, every pattern: `./build/wptest --area`
 - The edge width follows the waveform's slope: `./build/wptest --softness`
@@ -54,7 +54,11 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
   space about the positioner (`Waveform.h`). Every pattern is a formula in H
   and V; the CPU derives the frame, the waveform's range over the picture, and
   the pixel-to-waveform factor; the shader evaluates per pixel.
-- **The fader's ends are a branch in the shader**: Position ≤ 0 fetches A,
+- **The fader is `Opacity`, and the name is load-bearing.** Resolume binds a
+  mixer parameter named `Opacity` to the layer's opacity fader (measured on
+  genlock; writes to the mixer's own slider are overridden). 0 is A, 1 is B.
+  The shader's uniform is still called `Position`.
+- **The fader's ends are a branch in the shader**: Opacity ≤ 0 fetches A,
   ≥ 1 fetches B, nothing else runs. That is what makes them bitwise.
 - **Softness, Border Width and Mod Amount are pixels on the horizontal ramp.**
   Every other pattern converts through its reference slope

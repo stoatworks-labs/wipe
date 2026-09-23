@@ -18,9 +18,10 @@ Exit code 1 means something is dead.
 **This is a MIXER, so every render needs two inputs.** The harness feeds them
 itself -- `--input-a` is A, the layer below, and `--input-b` is B, this layer.
 
-**At the fader's ends nothing else exists.** Position 0 is A and Position 1 is B
-by construction, so every control is swept with Position at 0.5 (the default),
-and Position itself is the one control swept end to end.
+**At the fader's ends nothing else exists.** Opacity 0 is A and Opacity 1 is B
+by construction, so every control is swept with Opacity at 0.5 (the default),
+and Opacity itself -- the fader, which Resolume drives from the layer's opacity
+-- is the one control swept end to end.
 
 **A control only exists on the pattern that uses it.** Centre X/Y and Aspect
 move the closed patterns, not the ramps; Multiple V is on the vertical wipe;
@@ -74,7 +75,7 @@ CONTEXT = {
     "Reverse": {"Pattern": 2},
     "Flip-Flop": {"Pattern": 2, "_transitions": 1},
     "Aspect Comp": {"Pattern": 4},
-    "Law": {"Pattern": 2, "Position": 0.3},
+    "Law": {"Pattern": 2, "Opacity": 0.3},
     "Border Softness": BORDER,
     "Border Red": BORDER,
     "Border Green": BORDER,

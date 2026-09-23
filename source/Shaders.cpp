@@ -41,7 +41,8 @@ uniform vec2 MaxUVB;
 uniform vec2 HalfTexelA;
 uniform vec2 HalfTexelB;
 
-//The fader.
+//The fader: the Opacity parameter, which Resolume drives from the layer's
+//opacity fader. 0 is A, 1 is B.
 uniform float Position;
 
 //The generator's frame -- see Waveform.h.

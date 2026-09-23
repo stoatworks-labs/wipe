@@ -19,7 +19,7 @@ A 1970s vision mixer's analogue pattern generator, as an FFGL **mixer** for
 
 ![A soft circle wipe with a modulated border, revealing one test card over another](docs/hero.png)
 
-<sub>The repo's two test cards through the plugin — a circle at Position 0.42
+<sub>The repo's two test cards through the plugin — a circle at Opacity 0.42
 with a soft edge, a gold border and the modulator on — rendered by `wptest`,
 the offline harness, not captured from Resolume.</sub>
 
@@ -71,7 +71,11 @@ purpose: Resolume Arena does not show a mixer's first parameter (measured on
 genlock), so index 0 holds the one control whose default — on, a round circle —
 is right if nobody can ever reach it.
 
-**Fader** — Position, and Law. *Edge* is what the hardware did: the level is
+**Fader** — Opacity, and Law. **Opacity is the fader**: 0 is A, the layer below,
+and 1 is B, this layer. It is named Opacity on purpose, because Resolume binds a
+mixer parameter of that name to the **layer's opacity fader** (measured on
+genlock), so the layer's own fader drives the wipe and the Opacity slider in the
+mixer's panel is overridden. *Edge* is what the hardware did: the level is
 linear in the fader. *Area* chooses the level so that the B area is exactly
 the fader, solved in closed form for every pattern.
 
@@ -120,7 +124,7 @@ different sizes, with different hardware padding, rendered to a third size.
     ./build/wptest --out /tmp/frame.png     both cards, through the plugin
     ./build/wptest --list                   every parameter, kind and default
     ./build/wptest --mixer                  two inputs, two MaxUVs, and the guards
-    ./build/wptest --ends                   Position 0 IS A and 1 IS B, every pattern
+    ./build/wptest --ends                   Opacity 0 IS A and 1 IS B, every pattern
     ./build/wptest --edge                   the edge where Edge law puts it; circle vs ellipse
     ./build/wptest --area                   the B area where Area law puts it, every pattern
     ./build/wptest --softness               the edge width follows the waveform's slope
@@ -147,7 +151,7 @@ M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 | --- | --- |
 | Two inputs, two sizes, two MaxUVs | A 200×120 of 256×256, B 96×70 of 128×128, out 320×200: **0 padding pixels** reached the picture, every quadrant within **0.000 of 255**, the marker within one source texel |
 | The missing-input guards | a null input array, zero inputs, one input, a null A and a null B all return `FF_FAIL` without crashing |
-| The fader's ends | Position 0 is A and Position 1 is B, **bitwise, on all seven patterns**, with softness, border, modulation, multiple, positioner and rotation all on |
+| The fader's ends | Opacity 0 is A and Opacity 1 is B, **bitwise, on all seven patterns**, with softness, border, modulation, multiple, positioner and rotation all on |
 | Edge law, whole pixel | a hard edge at column p·W: B left, A right, **0 pixels wrong** at three columns |
 | Edge law, fractional | a soft edge at 160.5, 320.25, 480.75 px recovered by integration to **0.0000 px** (tolerance 0.02) |
 | Circle vs ellipse | Aspect Comp on: eight radii agree to **0.0007 px**; off: axes in the ratio **1.7778** of the picture's 1.7778, diagonal within 0.001 px of the ellipse |
@@ -167,8 +171,8 @@ Run `tools/verify.sh` before believing any of it.
 **Not done, and the honest list is long.** It has **never been loaded into
 Resolume** — not on macOS, not on Windows, not once — so every mixer-specific
 claim about the *host* is a guess: that Resolume reads mixers from Extra
-Mixers, whether it binds a parameter named `Opacity` to the layer's transition
-(this plugin's fader is called `Position` and does not rely on it), whether it
+Mixers, whether it binds a parameter named `Opacity` to the layer's opacity fader
+(this plugin's fader is called `Opacity` so that it does), whether it
 calls a mixer with one input while the operator is patching, and whether it
 drives a mixer's clock, which the modulator's travel depends on. The
 **Windows build has never been compiled**; CI exists and has never run,

@@ -113,7 +113,7 @@ public:
 		PT_FLIPFLOP,
 
 		//Fader
-		PT_POSITION,
+		PT_OPACITY,///< the fader: Arena binds it to the LAYER's opacity
 		PT_LAW,
 
 		//Edge

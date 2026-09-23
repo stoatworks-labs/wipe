@@ -66,7 +66,7 @@ that area in closed form: half-plane, polygon and disc clipping against the
 picture's parallelogram in q-space (`Waveform.cpp`), wedges for the clock, a
 sum over ranks for the matrix. Bisection to 1e-10 in level. There is no table.
 
-The fader's ends are a **branch**: `Position ≤ 0` fetches A, `≥ 1` fetches B,
+The fader's ends are a **branch**: `Opacity ≤ 0` fetches A, `≥ 1` fetches B,
 and nothing else runs, so neither a soft edge nor a border can leak into an end
 stop. That is what makes `--ends` a bitwise claim.
 
@@ -233,11 +233,11 @@ folder. An install to Extra Mixers installs nothing Arena sees.
 
 **`Size` was dropped.** The spec listed it under the positioner. With the
 level range normalised to the waveform's range over the picture (which is what
-makes Position 1 cover the picture from any positioner), a size multiplier on
+makes Opacity 1 cover the picture from any positioner), a size multiplier on
 the waveform is the fader by another name in Edge law, and in Area law it
 cancels out of the solve exactly. A *wipe limit* — a control that stops the
 wipe short at full fader, which some desks had — would be a different control
-and would have to override the Position-1 end stop; that is an open question
+and would have to override the Opacity-1 end stop; that is an open question
 below, not a slider that does nothing.
 
 **The positioner moves the closed patterns and the clock, not the ramps.** A
@@ -256,13 +256,19 @@ is exactly 16 on the ramp and on a box's side with Aspect Comp on, and on a
 circle it is 16 at one radius and the parabola's answer everywhere else. That
 is the idea, not a compromise.
 
-**The fader is `Position`, not `Opacity`.** The SDK's mixer example says
-Resolume binds a parameter named `Opacity` to the mix value; genlock recorded
-that as unverified and named its blend `Opacity` on the strength of the
-comment. This plugin does what the spec said: exposes `Position` and does not
-rely on the binding. If one session in Arena shows it binds, renaming is a
-one-line change and the transition control drives the wipe, which is the
-right behaviour for a mixer.
+**The fader is `Opacity`, not `Position`.** The spec said `Position`, and until
+v0.1.0 that is what it was called, with the note that "if one session in Arena
+shows it binds, renaming is a one-line change". genlock's session showed it
+binds: in Resolume Arena 7.27.1 a mixer parameter named `Opacity` is driven by
+the **layer's opacity fader** — genlock logged `1 → 0.42 → 1` exactly as the
+layer's opacity was set — and REST writes to the mixer's own `Opacity` (0.61,
+0.13) never reached the plugin. So the fader was renamed, and in Resolume the
+layer's own fader drives the wipe, which is the right behaviour for a mixer.
+The semantics and the maths are unchanged: 0 is A (the layer below), 1 is B
+(this layer), the ends are the same bitwise branch, and Flip-Flop counts
+arrivals at the layer fader's ends. The shader's uniform keeps the name
+`Position`, which is what the value is to the comparator. Whether the layer's
+*transition* or autopilot also moves it has not been tried on any mixer.
 
 **Index 0 is deliberately sacrificial: `Aspect Comp` sits there.** Resolume
 Arena 7.27.1 does not expose a mixer's first parameter — measured on genlock,
@@ -319,7 +325,7 @@ assumptions. It can be added later without moving anything.
 2026-09-23**, at 640×360 and 320×180 unless stated — the numbers are in the
 table above and in the README's Status. In one line each: two inputs at two
 sizes with two MaxUVs resolve independently (0 sentinel pixels, 0.000 of 255,
-the marker within one source texel); the five guards hold; Position 0 is A
+the marker within one source texel); the five guards hold; Opacity 0 is A
 and 1 is B bitwise on all seven patterns with everything on; a hard edge lands
 on its column with 0 pixels wrong and a soft one integrates to 0.0000 px; the
 circle is round to 0.0011 px and the ellipse has the picture's aspect to four
@@ -371,11 +377,12 @@ plugin builds were loading the CPU. Take the ceiling.
 
 ## Open questions
 
-1. **Does Resolume bind `Opacity`?** If it does, the fader should be renamed
-   so the layer's transition drives the wipe. One session in front of Arena.
+1. ~~Does Resolume bind `Opacity`?~~ **Yes, answered on genlock**: to the
+   layer's opacity fader. The fader is now `Opacity`. Still open: whether a
+   layer transition or autopilot moves it too.
 2. **Should there be a wipe limit?** A control that stops the wipe short at
    full fader — a split-screen or a spotlight — is what `Size` would have
-   been if it overrode the Position-1 end stop. It would break `--ends` for
+   been if it overrode the Opacity-1 end stop. It would break `--ends` for
    that setting on purpose.
 3. **Should softness be a fraction of the picture rather than pixels?** The
    hardware's softness was a fraction of the line time. Pixels is what the
