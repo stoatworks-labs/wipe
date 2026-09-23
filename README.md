@@ -26,6 +26,38 @@ A 1970s vision mixer's analogue pattern generator, as an FFGL **mixer** for
 with a soft edge, a gold border and the modulator on — rendered by `wptest`,
 the offline harness, not captured from Resolume.</sub>
 
+<!-- downloads:start -->
+
+## Download
+
+**[v0.1.0](https://github.com/stoatworks-labs/wipe/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+
+<details>
+<summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`wipe-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/wipe/releases/download/v0.1.0/wipe-0.1.0-macos-universal.dmg) | 202 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`wipe-macos-universal.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-macos-universal.zip) | 158 KB |
+
+</details>
+
+<details>
+<summary><b>Windows</b> — x64</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| x64 · .exe installer | [`wipe-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/wipe/releases/download/v0.1.0/wipe-0.1.0-windows-x86_64-setup.exe) | 222 KB |
+| x64 · .zip archive | [`wipe-windows-x86_64.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-windows-x86_64.zip) | 113 KB |
+
+</details>
+
+All builds, checksums and release notes: [github.com/stoatworks-labs/wipe/releases](https://github.com/stoatworks-labs/wipe/releases).
+
+The Windows builds are unsigned, so SmartScreen warns once.
+
+<!-- downloads:end -->
+
 ## Every wipe is a waveform and a comparator
 
 A vision mixer of that era did not store its wipes as pictures. It made them
