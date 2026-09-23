@@ -68,6 +68,14 @@ and the clip on this layer is B, which the fader wipes in. The
 [user guide](docs/USER-GUIDE.md) covers installing it, picking it as a layer's
 Blend Mode, and every control.
 
+[![Wipe — a 1970s vision mixer's pattern generator, for Resolume](docs/video-thumb.png)](https://www.youtube.com/watch?v=HIclO2s5ylw)
+
+*[Watch it](https://www.youtube.com/watch?v=HIclO2s5ylw) — 55 seconds:
+a hard Horizontal wipe, Box and Diamond, a soft Circle whose edge is softer near its middle, a Clock with a border, a modulated edge, Multiple, and the positioner turning a box as it opens. Every frame is the real plugin's output: an FFGL plugin has no window,
+so the footage is rendered by this repository's own offline harness
+(`wptest --pipe`, driven by a cue sheet) rather than filmed off a screen, and
+the clips are Resolume's bundled demo media.*
+
 ## The controls
 
 **Pattern** — Aspect Comp, Pattern, Reverse, Flip-Flop (reverse on alternate
