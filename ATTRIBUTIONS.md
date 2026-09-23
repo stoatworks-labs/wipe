@@ -1,76 +1,81 @@
 # Attributions
 
-Wipe is built on other people's work. This file lists what that work is, who
-did it, and what it is doing here.
+Wipe is built on other people's work. This file lists what that work is, who did
+it, and what it is doing here.
 
-> **Provisional.** Across the fleet this file is generated from master lists in
-> `stoatworks-backend` by `scripts/sync-attributions.py`. Wipe is not in that
-> script's lists at all yet — it is a new repo — so this copy is hand-written,
-> adapted from genlock's; v0.1.0 ships that way. Registering the project and
-> re-running the sync is the fix — and note that the script's `--only` flag
-> truncates the file rather than filtering it.
+It is generated — the master lists live in the `stoatworks-backend` repo and are
+pushed out by `scripts/sync-attributions.py`. Edit it there, not here.
+
+## Code we derived from other people's work
+
+Someone else solved this first, and this project would not exist in its current form without their work.
+
+### Mixer mechanics, two-input harness and Timing — Stoatworks genlock
+
+<https://github.com/stoatworks-labs/genlock>  
+Licence: MIT  
+Copyright: Stoatworks Labs
+
+The mixer mechanics of ProcessOpenGL (guard on the input count, guard on each pointer, one MaxUV per input, interleaved scoped bindings), the two-input harness rig and its --mixer check, the host-clock Timing.* and the CMake shape are genlock's, adapted.
+
+### Diagnostics log — Stoatworks tinsel
+
+<https://github.com/stoatworks-labs/tinsel>  
+Licence: MIT  
+Copyright: Stoatworks Labs
+
+source/Diag.* is tinsel's log, renamed into this namespace.
+
+### Sweep and verify shape — Stoatworks graticule
+
+<https://github.com/stoatworks-labs/graticule>  
+Licence: MIT  
+Copyright: Stoatworks Labs
+
+tools/sweep.py and the release-job-locally checks in tools/verify.sh follow genlock's and graticule's.
 
 ## Third-party code this project uses
 
+Libraries, SDKs and frameworks the project is built on or bundles.
+
 ### Resolume FFGL SDK
 
-<https://github.com/resolume/ffgl>
-Licence: BSD-3-Clause
+<https://github.com/resolume/ffgl>  
+Licence: BSD-3-Clause  
 Copyright: FreeFrame
 
-Vendored as a git submodule at `external/ffgl`, pinned to `b1afaf9`.
+Vendored as a git submodule at external/ffgl (third_party/ffgl in oxbow).
 
-The plugin ABI itself. An FFGL plugin is defined by this SDK's headers — there
-is no other way to be loadable by Resolume Arena and Avenue.
+The plugin ABI itself. An FFGL effect or source is defined by this SDK's headers — there is no other way to be loadable by Resolume Arena and Avenue.
 
 ### GLEW — the OpenGL Extension Wrangler Library
 
-<https://github.com/nigels-com/glew>
-Licence: BSD-3-Clause (with Mesa 3-D and Khronos components)
+<https://github.com/nigels-com/glew>  
+Licence: BSD-3-Clause (with Mesa 3-D and Khronos components)  
 Copyright: Milan Ikits, Marcelo E. Magallon and Lev Povalahev
 
-Windows only, from vcpkg, statically linked. The SDK's headers pull it in for
-the OpenGL function pointers; macOS uses the system OpenGL framework instead.
+Arrives inside the FFGL submodule at external/ffgl/deps/glew-2.1.0. Not fetched separately.
 
-### zlib
+Resolves OpenGL entry points on Windows, where the system headers stop at OpenGL 1.1.
 
-<https://zlib.net>
-Licence: zlib
-Copyright: Jean-loup Gailly and Mark Adler
+### libpng
 
-Ships with macOS. Linked by the offline harness only, which writes its PNGs
-with it rather than carrying an image library.
+<http://www.libpng.org/pub/png/libpng.html>  
+Licence: PNG Reference Library License (libpng)  
+Copyright: the PNG Reference Library authors
 
-## Work from elsewhere in the fleet
+Arrives inside the FFGL submodule, under the SDK's CustomThumbnail sample.
 
-### genlock, tinsel, graticule
+Part of the upstream SDK tree rather than something these plugins call directly — listed because it is present in the checkout.
 
-<https://github.com/stoatworks-labs>
-Licence: MIT
-Copyright: Stoatworks Labs
+## Inspirations
 
-genlock is the primary template: the mixer mechanics of `ProcessOpenGL` (guard
-on the input count, guard on each pointer, one `MaxUV` per input, interleaved
-scoped bindings), the two-input harness rig and its `--mixer` check, the
-host-clock `Timing.*` and the CMake shape are its, adapted. `source/Diag.*` is
-tinsel's, renamed into this namespace. `tools/sweep.py` and the
-release-job-locally checks in `tools/verify.sh` follow genlock's and
-graticule's. The About header and `StoatworksAboutLinks.h` are hand copies of
-the generated ones, with `guide=""` because no user guide exists.
+What this set out to be. No code, assets or binaries from any of these were used or examined — the debt is to the idea.
 
-## Method
+### Analogue vision-mixer wipe generators
 
-The pattern generator modelled here is implemented from the published
-description of how analogue wipe generators worked — ramps and parabolas at
-line and field rate, combined by addition or non-additive mix, compared against
-a fader-derived level, with softness as comparator gain, a border as a second
-comparator and modulation as an added sine. The matrix wipe's cell order is
-this repo's own (a Feistel permutation), not any vendor's ROM. No vendor's
-schematic, firmware or captured output was used, and nothing was measured off
-real hardware — there is none here. The look is a model, not a characterisation
-of anybody's desk.
+Implemented from the published description of how analogue wipe generators worked: ramps and parabolas at line and field rate, combined by addition or non-additive mix, compared against a fader-derived level, with softness as comparator gain, a border as a second comparator and modulation as an added sine. The matrix wipe's cell order is this repo's own (a Feistel permutation), not any vendor's ROM. No schematic, firmware or captured output was used; the look is a model, not a characterisation of anybody's desk.
 
 ## Getting this wrong
 
-If your work is here and the description is inaccurate, the licence is wrong, or
-you would rather not be listed — open an issue and it will be fixed.
+If your work is here and the description is inaccurate, the licence is wrong, or you would rather not be listed — open an issue and it will be fixed.
