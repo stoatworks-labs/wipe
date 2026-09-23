@@ -9,11 +9,13 @@
 > every pattern's B area within **0.33 px** of the fader in Area law, a circle's
 > soft edge widening towards its centre **exactly as the parabola predicts**
 > (41.855 px measured, 41.855 predicted), the modulator's sine recovered to
-> **16.0000 px** of 16 (see [Status](#status)). Wipe itself has **never been
-> loaded into Resolume**, on any platform — not once. It is the fleet's second
-> FFGL *mixer*; the first, genlock, has been measured in Resolume Arena 7.27.1,
-> and Wipe is built to what that session found. Check it in your own rig before
-> trusting it in a show.
+> **16.0000 px** of 16 (see [Status](#status)). It has **never been loaded into
+> Resolume on macOS**. On Windows, a build of v0.1.0 loads in Resolume Arena
+> 7.27.1, is offered as a layer's Blend Mode and is driven by the layer's opacity
+> fader, on software rendering; no frame of its picture inside Resolume has been
+> captured. It is the fleet's second FFGL *mixer*, built to what the first,
+> genlock, measured in Arena. Check it in your own rig before trusting it in a
+> show.
 
 A 1970s vision mixer's analogue pattern generator, as an FFGL **mixer** for
 [Resolume](https://resolume.com) Arena and Avenue.
@@ -71,14 +73,14 @@ Blend Mode, and every control.
 **Pattern** — Aspect Comp, Pattern, Reverse, Flip-Flop (reverse on alternate
 transitions: A box-wipes in, then B box-wipes in). Aspect Comp is first on
 purpose: Resolume Arena does not show a mixer's first parameter (measured on
-genlock), so index 0 holds the one control whose default — on, a round circle —
-is right if nobody can ever reach it.
+genlock, and confirmed on Wipe), so index 0 holds the one control whose
+default — on, a round circle — is right if nobody can ever reach it.
 
 **Fader** — Opacity, and Law. **Opacity is the fader**: 0 is A, the layer below,
 and 1 is B, this layer. It is named Opacity on purpose, because Resolume binds a
 mixer parameter of that name to the **layer's opacity fader** (measured on
-genlock), so the layer's own fader drives the wipe and the Opacity slider in the
-mixer's panel is overridden. *Edge* is what the hardware did: the level is
+genlock and on Wipe), so the layer's own fader drives the wipe and the Opacity
+slider in the mixer's panel is overridden. *Edge* is what the hardware did: the level is
 linear in the fader. *Area* chooses the level so that the B area is exactly
 the fader, solved in closed form for every pattern.
 
@@ -148,7 +150,7 @@ number and where it comes from.
 
 ## Status
 
-**v0.1.0, unreleased, and honestly early.** Verified by measurement on an Apple
+**v0.1.0, and honestly early.** Verified by measurement on an Apple
 M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 
 | Check | Result |
@@ -165,33 +167,48 @@ M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 | Modulation | amplitude **16.0000 px** of 16, RMS residual from a sine **0.0000 px**, and a quarter second at 1 Hz moves the phase by exactly −π/2 |
 | Flip-Flop | four transitions in a row alternate the box bitwise; the first arrival at an end counts for nothing |
 | Mutation test | one character of the shipped GLSL (the comparator's 0.5 → 0.6) fails **five** checks; the circle built from \|H\|+\|V\| fails `--softness`; one MaxUV for both inputs fails `--mixer` |
-| No dead controls | all **21** sweepable of the 25 parameters change the picture; the other four are the About buttons |
+| No dead controls | all **21** sweepable of the 26 parameters change the picture; the other five are the About block |
 | macOS binary | universal (`x86_64 arm64`), exports `plugMain`, ad-hoc signs |
 | Host metadata | `oxbow probe` reads **SW Wipe / WP01 / mixer / inputs 2..2**, parameter 0 **Aspect Comp** |
 | Render cost | **0.03 ms/frame at 720p, 0.04 at 1080p, 0.12 at 4K** (0.7% of a 60 fps frame), worst of several runs. Area law adds a CPU solve on the frames where something changed: under 0.06 ms for any single pattern, **2.8 ms for a box at Multiple 8×8 and 7.8 ms for a circle** on a quiet machine (6.9 and 16.9 with other builds loading the CPU) |
 
 Run `tools/verify.sh` before believing any of it.
 
+**Windows, in Resolume Arena 7.27.1** (win-lab, Mesa llvmpipe, no GPU,
+2026-09-23). The fleet's Arena gate cannot gate a mixer, so a CI build of this
+source was probed by hand over Arena's REST API and the plugin's own log, as
+genlock was. It loads from **Extra Effects**; Arena's log registers it as
+`'SW Wipe' uid: WP01 category: 2` beside Resolume's own blend modes, and it is
+offered in every layer's **Blend Mode** list. Set as layer 3's blend mode over a
+still on layer 2, its log shows it initialised on Mesa llvmpipe (GL 4.5 Core),
+loaded by Arena 7.27.1 build 15990 from Extra Effects, with no error line in
+either log. Setting the **layer's** opacity to 0.3, 0.7 and 1.0 read back as the
+mixer's `Opacity` 0.3, 0.7 and 1.0, and a write of 0.2 to the mixer's own
+Opacity was overridden (it read back 1.0, the layer's): the layer's fader drives
+the wipe, as designed. Writing Pattern = Circle over REST took. The mixer panel
+shows **25 of the 26** declared parameters, and the one missing is **Aspect
+Comp, index 0**: Arena hides a mixer's first parameter, as it hid genlock's, and
+parking Aspect Comp there worked. No frame of the mixer's output was captured
+(Arena's REST does not serve a mixer's picture), so a correct render inside
+Resolume is not claimed.
+
 **Not done, and the honest list is long.** Wipe has **never been loaded into
-Resolume** — not on macOS, not on Windows, not once. What it knows about how
-Resolume treats a mixer comes from **genlock**, the fleet's first, which was
-measured in Resolume Arena 7.27.1 on Windows (software rendering, 2026-09-23):
-Arena loads mixers from **Extra Effects** and offers them as a layer's **Blend
-Mode**; it hands both inputs **padded** (1280×720 of 1280×768); it calls
-`SetTime` **every frame, in milliseconds**, so the modulator will travel; it
-binds a parameter named **`Opacity` to the layer's opacity fader**, which is
-why Wipe's fader carries that name; and it **does not show a mixer's first
-parameter**, which is why Wipe's is Aspect Comp. None of that has been
-re-checked with Wipe itself, whether Arena ever calls a mixer with one input
-is still open, and nobody has looked at a mixer's picture inside Resolume. The
-**Windows build has never been compiled**; CI exists and has never run,
-because there is no remote. Nothing has run on a **rasteriser other than this
-Mac's**. The spec's `Size` control was dropped, for a stated reason. Area law
-with both Multiples high is the one setting whose CPU cost is worth knowing
-about. There are **no presets**, no OpenFX port and no browser demo. The
-[user guide](docs/USER-GUIDE.md) is written, but the About block carries no
-guide button yet: it is a provisional hand copy (as is `ATTRIBUTIONS.md`), and
-the button arrives when registration regenerates it.
+Resolume on macOS**, and its picture has not been looked at inside Resolume on
+either platform. That Arena hands a mixer both inputs **padded** and calls
+`SetTime` **every frame, in milliseconds** (so the modulator will travel) was
+measured on genlock and not re-checked on Wipe. Whether a layer transition or
+the autopilot moves `Opacity`, and whether Arena ever calls a mixer with one
+input, are still open. CI runs on GitHub: the Windows DLL compiles with MSVC,
+and on the GPU-less macOS runner eight of the nine suites pass, but `--area`
+fails at 640×360 on four patterns (Vertical, Box, Box reversed, Clock:
+1.04–1.50 px of continuous area off the fader against a one-pixel tolerance,
+while the displayed area is within 0.5 px and every pattern passes at
+320×180), so that job is red. Nothing has run on a **GPU other than this
+Mac's**. The spec's `Size` control was dropped, for a stated reason.
+Area law with both Multiples high is the one setting whose CPU cost is worth
+knowing about. There are **no presets**, no OpenFX port and no browser demo.
+The [user guide](docs/USER-GUIDE.md) covers every control, and the About
+block's fourth button opens it.
 
 [AGENTS.md](AGENTS.md) has the full list of what is assumed rather than
 measured, the open questions, and the traps.

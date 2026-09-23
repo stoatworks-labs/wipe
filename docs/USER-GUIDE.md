@@ -23,10 +23,10 @@ harness, not captured from Resolume.*
 > centre exactly as the parabola predicts (**41.855 px** measured, 41.855
 > predicted). The modulator's sine comes back at **16.0000 px** of 16. All 21
 > controls the harness can sweep change the picture.
-> It has **never been loaded into Resolume on macOS**. What it assumes about how
-> Resolume treats a mixer was measured on Genlock, the fleet's first mixer, not on
-> Wipe.
-> On Windows: (to be filled after the Arena run).
+> It has **never been loaded into Resolume on macOS**.
+> On Windows, a build of v0.1.0 loads in Resolume Arena 7.27.1, is offered as a layer's Blend Mode, is driven by the layer's opacity fader and hides only Aspect Comp, as designed — on software rendering, and no picture of it inside Resolume has been captured, so a correct render there is not yet shown.
+> The rest of what it assumes about how Resolume treats a mixer was measured on
+> Genlock, the fleet's first mixer.
 > **Try it on a spare layer first**, and please report anything that misbehaves.
 >
 > This codebase was created with AI assistance, directed and reviewed by a human
@@ -114,8 +114,8 @@ generator actually drew.
 > does not show a mixer's first parameter at all (measured on Genlock, whose first
 > control vanished from the panel). So Wipe puts Aspect Comp first, because its
 > default is the right setting if it can never be changed: in Resolume, circles
-> are always round and the ellipse cannot be reached. Which parameter Arena hides
-> has not yet been checked with Wipe itself.
+> are always round and the ellipse cannot be reached. In Arena 7.27.1 on Windows,
+> Wipe's panel shows every control except Aspect Comp, so this works as intended.
 
 **Pattern**: the shape of the wipe. The default is **Horizontal**.
 
@@ -153,9 +153,9 @@ created does not count, and turning Flip-Flop off clears it.
 **Opacity**: the fader. 0 is all A, the layer below; 1 is all B, this layer. The
 default is 0.5, but **in Resolume this is driven by the layer's opacity fader**,
 and the Opacity slider in the mixer's own panel is overridden: moving it or
-automating it does nothing. Use the layer's fader. (Measured on Genlock in Arena
-7.27.1 on Windows. Whether a layer transition or the autopilot also moves it has
-not been tried.)
+automating it does nothing. Use the layer's fader. (Measured on Genlock and on
+Wipe in Arena 7.27.1 on Windows. Whether a layer transition or the autopilot also
+moves it has not been tried.)
 
 At exactly 0 and exactly 1 the output is the untouched picture, bit for bit: no
 soft edge, border or wobble can leak into an end stop.
@@ -342,14 +342,15 @@ and an error line if the shader failed to compile.
 
 - **Aspect Comp is hidden in Resolume.** Arena does not show a mixer's first
   parameter, so Wipe puts Aspect Comp there on purpose. In Resolume it is always
-  on: circles are round and the ellipse cannot be chosen. This is inferred from
-  Genlock and has not been checked with Wipe.
+  on: circles are round and the ellipse cannot be chosen. Checked with Wipe in
+  Arena 7.27.1 on Windows.
 - **The fader is the layer's opacity.** In Resolume the mixer's own Opacity
   slider is overridden by the layer's opacity fader, so it cannot be set or
   automated separately. Whether a layer transition or the autopilot moves it has
   not been tried on any mixer.
-- **Never loaded into Resolume on macOS**, and never run on any graphics card but
-  the Mac it was built on.
+- **Never loaded into Resolume on macOS.** In Resolume on Windows it has run only
+  on software rendering, and its picture there has not been captured. No graphics
+  card but the Mac it was built on has run it.
 - **Sizes are in pixels**, so a 4K edge is half the share of the picture of a
   1080p one.
 - **Area law with the modulator on** gives the area of the wipe without the
@@ -362,8 +363,8 @@ and an error line if the shader failed to compile.
 ## About
 
 The last group, **About**, carries a credit line (name, version, licence and
-maker) and buttons that open the project page, the source on GitHub and the
-support page in your browser.
+maker) and buttons that open this user guide, the project page, the source on
+GitHub and the support page in your browser.
 
 ## Reporting something
 

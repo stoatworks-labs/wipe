@@ -3,11 +3,11 @@
 **What it is:** an FFGL 2.1 **mixer** for Resolume Arena/Avenue that makes its
 wipes the way a 1970s vision mixer did: from waveforms and a comparator, not
 from pictures. C++17 + GLSL 4.10, CMake, universal macOS `.bundle` and a
-Windows `.dll`. MIT. Intended home `github.com/stoatworks-labs/wipe`; **it is
-not there yet** — v0.1.0 is local, unreleased, and Wipe itself has never been
-in front of Resolume. genlock, the fleet's first mixer, has (Arena 7.27.1,
-Windows, 2026-09-23), and this build was corrected to what that session
-measured — see "What genlock measured in Arena" below.
+Windows `.dll`. MIT. Home `github.com/stoatworks-labs/wipe`, released v0.1.0.
+genlock, the fleet's first mixer, was measured in Arena 7.27.1 (Windows,
+2026-09-23), and this build was corrected to what that session measured; Wipe
+itself was then probed in the same Arena the same day — see "What genlock
+measured in Arena" and "What Wipe showed in Arena" below.
 
 `CLAUDE.md` is the command reference. This file is the *why*: the idea, every
 number in the harness and where it comes from, the traps this build actually
@@ -143,7 +143,14 @@ check:
   softness width — which is stated, and which is why the diamond and the
   lattice are not in it.
 - `--flipflop`: yes — bitwise comparison of two renders of the same plugin.
-- What has NOT been proved: any of this on llvmpipe. CI has never run.
+- What has NOT been proved: any of this on llvmpipe. CI has run on GitHub's
+  GPU-less macOS runner (Apple's software rasteriser, not llvmpipe), and there
+  `--area` **fails**: at 640×360, Vertical 1.504, Box 1.040, Box reversed 1.053
+  and Clock 1.086 px of continuous area off the fader against the one-pixel
+  tolerance, while their displayed areas are 0.28–0.49 px and every pattern
+  passes at 320×180. The other eight suites pass there. So on that evidence the
+  continuous check does depend on the rasteriser at 640×360; whether through the
+  2560×1440 supersampled reference or the bound is open question 7.
 
 ---
 
@@ -289,7 +296,9 @@ plugin that had never been released (nothing persisted them). `wptest --names`
 and `verify.sh`'s oxbow step assert the declaration. **Arena must confirm
 which parameter it hides**: both checks read what the plugin declares, and the
 declaration was right on genlock too. If Arena turns out to hide something
-other than id 0, the fix is still only what is declared first.
+other than id 0, the fix is still only what is declared first. (Arena did
+confirm it, on Wipe, 2026-09-23: its mixer panel shows 25 of the 26 declared
+parameters, and the missing one is Aspect Comp.)
 
 **Reverse mirrors W within its range**, `wMin + wMax − W`, rather than
 swapping A and B: a reversed box *closes* on A rather than opening on B, and a
@@ -342,7 +351,39 @@ REST API on 2026-09-23, and its own log read back. What that established about
 | No one-input call observed while the layer below was cleared and refilled | The guards stay; not proven never |
 | No mixer frame can be grabbed over REST | Nothing claims a picture inside Resolume |
 
-None of this has been re-run with Wipe.
+Wipe's own session, below, re-checked the Extra Effects, Blend Mode, `Opacity`
+and first-parameter rows on Wipe itself. The padding and clock rows have not
+been re-run with Wipe.
+
+---
+
+## What Wipe showed in Arena
+
+A CI build of v0.1.0 in **Resolume Arena 7.27.1** (build 15990) on win-lab —
+Windows x64, Mesa llvmpipe, no GPU — on 2026-09-23. The fleet's Arena gate
+cannot gate a mixer, so it was probed by hand over Arena's REST API and read
+back from the plugin's own diag log, as genlock was.
+
+- **Loads from Extra Effects.** Arena's log registers it as
+  `'SW Wipe' uid: WP01 category: 2`, beside Resolume's own blend modes, and it
+  is offered in every layer's Blend Mode list.
+- **Initialises.** Set as layer 3's blend mode over a still on layer 2, the
+  diag log shows `initialised` on `Mesa llvmpipe ... 4.5 (Core Profile)` and
+  `host=Resolume Arena version=7.27.1 15990 loaded from C:\Users\lab\Documents\Resolume Arena\Extra Effects\Wipe.dll`.
+  No error lines in either log.
+- **The layer's opacity drives `Opacity`.** Setting the layer's opacity to 0.3,
+  0.7 and 1.0 read back as the mixer's `Opacity` 0.3, 0.7 and 1.0; a REST write
+  of 0.2 to the mixer's own `Opacity` was overridden (read back 1.0, the
+  layer's). As designed.
+- **Other parameters take REST writes.** Pattern = Circle took.
+- **Index 0 is hidden, and it is Aspect Comp.** The mixer panel exposes 25 of
+  the 26 declared parameters; the missing one is Aspect Comp, id 0. Second
+  mixer to show Arena hiding a mixer's first parameter, after genlock, and
+  parking Aspect Comp there worked.
+- **Not established:** no frame of the mixer's output was captured (Arena's
+  REST does not serve a mixer's picture), so a correct render in Resolume is
+  not claimed. Whether a layer transition or the autopilot drives `Opacity`,
+  and whether Arena ever calls a mixer with one input, remain open.
 
 ---
 
@@ -385,35 +426,31 @@ plugin builds were loading the CPU. Take the ceiling.
 
 **Assumed, or not yet done:**
 
-- **Wipe has never been loaded into Resolume.** Not once, on either platform.
-  Its host behaviour is inferred from genlock's Arena session (below), not
-  measured on Wipe: in particular that `Aspect Comp`, not something else, is
-  what Arena hides, that the layer's opacity fader reaches `Opacity`, and that
-  the modulator travels on Arena's millisecond clock. No mixer's picture has
-  been looked at inside Resolume, and nothing on macOS at all.
-- **Never run on another rasteriser.** The tolerances are derived and the
-  "would this hold" list above is argued, not proved. CI has never run.
-- **Windows has never been compiled.**
+- **Never loaded into Resolume on macOS.** On Windows it was probed by hand in
+  Arena 7.27.1 (above): loading, Blend Mode, the `Opacity` binding and the
+  hidden index 0 are measured on Wipe. Still inferred from genlock only: that
+  both inputs arrive padded and that the modulator travels on Arena's
+  millisecond clock. No mixer's picture has been looked at inside Resolume.
+- **The checks have not all held on another rasteriser.** The tolerances are
+  derived and the "would this hold" list above is argued. On CI's GPU-less
+  macOS runner eight suites pass and `--area` fails at 640×360 (see that list);
+  the harness has never run on llvmpipe. The Windows DLL compiles with MSVC in
+  CI, and ran in Arena only for the probe above.
 - **Premultiplied alpha is assumed.** `mix( a, b, key )` on whatever the host
   hands over; the border is composited opaque.
 - **The spec's `Size` is not here**, for the reason above.
 - **Area law with modulation on** is the area of the unmodulated waveform;
   the sine's mean over a non-integer number of periods is not accounted for.
 - **No OpenFX port and no browser demo.** Neither is required for 0.1.0.
-- **The About block has no User guide button**, although `docs/USER-GUIDE.md`
-  now exists. Decided without asking: the About headers are generated from the
-  website's projects.json and must not be hand-edited here, so the button
-  arrives when the release registers the project and regenerates them. The
-  guide's About section describes the three buttons that exist today.
-- `StoatworksAbout.h` and `ATTRIBUTIONS.md` are provisional hand copies.
 
 ---
 
 ## Open questions
 
-1. ~~Does Resolume bind `Opacity`?~~ **Yes, answered on genlock**: to the
-   layer's opacity fader. The fader is now `Opacity`. Still open: whether a
-   layer transition or autopilot moves it too.
+1. ~~Does Resolume bind `Opacity`?~~ **Yes, answered on genlock and then on
+   Wipe itself** (2026-09-23): the layer's opacity 0.3/0.7/1.0 read back as
+   Wipe's `Opacity`, and a write to the mixer's own was overridden. Still open:
+   whether a layer transition or autopilot moves it too.
 2. **Should there be a wipe limit?** A control that stops the wipe short at
    full fader — a split-screen or a spotlight — is what `Size` would have
    been if it overrode the Opacity-1 end stop. It would break `--ends` for
@@ -428,6 +465,14 @@ plugin builds were loading the CPU. Take the ceiling.
 5. **Is the Area-law solve fast enough on a slow CPU at Multiple 8×8?** 7.8 ms
    here on the render thread; a table per (pattern, multiples) would remove
    it, at the cost of the closed form.
+6. **Does Arena ever call a mixer with one input?** Not seen on genlock or on
+   Wipe; the guards stay.
+7. **Why does `--area` fail on the GPU-less runner at 640×360?** Four patterns
+   land 1.04–1.50 px of continuous area off the fader there (one-pixel
+   tolerance; worst 0.33 px on this Mac) and pass at 320×180. The continuous figure comes from a 2560×1440
+   supersampled render; whether that render or the bound is what differs on a
+   software rasteriser has not been looked at. Until it is, CI's macOS job is
+   red.
 
 ---
 

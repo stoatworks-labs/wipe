@@ -95,20 +95,23 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
   first parameter (measured on genlock: its id 0 is missing from the panel and
   the REST JSON). So index 0 is `Aspect Comp`, whose default (on) is right if it
   can never be reached. Never put a control a mixer needs there. `--names` and
-  `verify.sh`'s oxbow step assert it; only Arena can confirm which one it hides.
+  `verify.sh`'s oxbow step assert it; Arena 7.27.1 confirmed it on Wipe
+  (2026-09-23: the panel shows 25 of 26, and the missing one is Aspect Comp).
 - FFGL id is `WP01`. Display name `SW Wipe`.
 
 ## Not done yet
-- Wipe itself never loaded into Resolume, on any platform. What it assumes
-  about the host (Extra Effects, Blend Mode, `Opacity` bound to the layer's
-  fader, parameter 0 hidden, `SetTime` in ms every frame) was measured on
-  genlock in Arena 7.27.1 on Windows, not on Wipe. Never run on any rasteriser
-  but this Mac's. Windows never compiled.
-- No release tag, no remote, not registered on the website. `StoatworksAbout.h`
-  and `ATTRIBUTIONS.md` are provisional hand copies.
+- **Never loaded into Resolume on macOS.** On Windows (Arena 7.27.1, llvmpipe,
+  2026-09-23) the v0.1.0 CI build was probed by hand over REST: it loads from
+  Extra Effects, is offered as a Blend Mode, initialises with a clean log, the
+  layer's opacity drives `Opacity`, and Aspect Comp (index 0) is the one
+  parameter hidden. No mixer frame was captured, so a correct render in
+  Resolume is not claimed. Padded inputs and `SetTime` in ms were measured on
+  genlock only; transition/autopilot on `Opacity` and a one-input call are open.
+- CI: the Windows DLL compiles with MSVC; the macOS job is red because
+  `--area` fails at 640×360 on four patterns on the GPU-less runner (see
+  AGENTS.md). The other eight suites pass there.
 - No `Size` control (dropped, see AGENTS.md), no presets, no OpenFX port, no
-  browser demo. `docs/USER-GUIDE.md` exists; the About block has no guide
-  button until registration regenerates it.
+  browser demo.
 
 ## Diagnostics
 
