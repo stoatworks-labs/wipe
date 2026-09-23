@@ -92,7 +92,8 @@ systematic and does not average out.
 | `--edge` fractional | **0.02 px**, derived bound 1.5e-3 px | The soft edge's position is the sum of the key along the row — a linear functional, so it translates exactly. The only error is float32 through the comparator over the ~10 partial columns: (softPx+2) · 2⁻²³ · W · 2. The check asserts bound × 3 ≤ tolerance. Measured 0.0000. Negative control: the sum is not a whole column. |
 | `--edge` circle | **0.05 px** spread over eight radii | The 50% crossing along a ray of pixel centres from the positioner (put on a pixel centre), by interpolation. The key along a ray is quadratic in r, so the interpolation bias is ≤ 1/(8r) px per crossing — asserted ≤ tol/3 — and the spread cancels most of it anyway. Measured 0.0007 and 0.0011. |
 | `--edge` ellipse | axes ratio within 2·tol/r_y; diagonal within 0.05 px | With Aspect Comp off the level set in the unit square is a circle, so on screen it is an ellipse with axes in the picture's ratio, and its 45° radius is the ellipse's polar form of the two measured axes. Negative control: the axes differ by 63 px. |
-| `--area` continuous | **1 px of area**, at the test raster | The sum of the key over a 4× supersampled render of the same geometry (softness scaled with it). The solver is exact to 1e-10 in level; the band quadrature to 1e-10/softW; the pixel sum's own error is the sum-vs-integral residual of a piecewise-linear key, which is what the supersample is for (see the trap). Worst 0.33 px (Box 2×2). |
+| `--area` continuous | **1 px of area + the GL's allowance**, at the test raster, judged per fader position | The sum of the key over a 4× supersampled render of the same geometry (softness scaled with it). The solver is exact to 1e-10 in level; the band quadrature to 1e-10/softW; the pixel sum's own error is the sum-vs-integral residual of a piecewise-linear key, which is what the supersample is for (see the trap) — that is the 1 px. The GL's allowance is the OpenGL 4.1 core spec's own precision (§2.1.1: results "accurate to about 1 part in 10^5"), applied to the interpolated `uv` the waveform is drawn from: each axis may be off by ε = 1e-5, which moves an edge element with normal n by \|nₓ\|·ε·W + \|n_y\|·ε·H pixels. Integrated along the edge that is ε·∫(\|nₓ\|W + \|n_y\|H)dl, and by the co-area formula that integral is Σ(\|Δₓk\|·W + \|Δ_yk\|·H) over the rendered key — read off the picture, so no per-pattern perimeter formula can drift from what was drawn — plus ε per pixel inside the band for the comparator's own arithmetic. A vertical wipe at 640×360: 1e-5 × 640 × 360 = 2.3 px. Worst on this Mac's GPU 0.33 px (Box 2×2); worst on Apple's software renderer 1.504 px of 3.40 (Vertical). See the trap. |
+| `--area` resolution | every tolerance **under a quarter-pixel shift** of its own edge | The negative control on the allowance: a one-pixel shift of the whole edge moves the area by the edge's length in pixels (co-area again, Euclidean gradient), and the spec's share of that is only 1e-5 × 640 = 0.006. Asserted per case and position; the coarsest is the plain Horizontal wipe, 3.33 px of tolerance against a quarter-pixel shift of 89.8 px. Mutation-checked: the fader off by 1 part in 10⁴ (18 px) fails 17 of the 22 cases on the software renderer. |
 | `--area` displayed | **1 px**, corner-free patterns only | The same sum over the plain pixel centres. Softness is **8 px, an integer**, so on an axis-aligned edge the two kinks of the linear ramp sit at the same fractional phase and Euler–Maclaurin cancels exactly; on a curved edge the phases are spread and the residual is ~1/(8w) per unit length with random sign. A soft box **corner** is a 45° kink over a w×w patch and carries ~0.1 px each — four corners give 0.3–0.5 px — and a 45° **edge** projects the pixel centres onto its normal as a single-phase lattice, so the diamond and the 2×2 lattice are measured continuous-only and say so. Worst 0.68 px (Circle at 320×180). |
 | `--area` negative | Edge law on the box is **> 100 px** off | Level linear in the fader gives 0.4445 of the picture at 0.5, 12,778 px from the fader: the check tells the two laws apart. |
 | `--softness` horizontal | **0.02 px** | 10–90% crossings on a linear ramp, exact by interpolation; 0.8 × the stated width because the comparator is a linear clip. Measured 12.8000 of 12.8. At Softness 0, **0 partial pixels**. |
@@ -137,20 +138,22 @@ check:
 - `--edge` circle, `--softness`, `--border` circle: yes — crossings by
   interpolation with a curvature bound stated in pixels of *this* raster and
   asserted ≤ tol/3; at 320×180 the bound doubles and still fits.
-- `--area` continuous: yes — the pixel sum's residual is the geometry's, not
-  the GPU's, and the 4× supersample puts it under 0.4 px on the worst case.
+- `--area` continuous: yes, now — the pixel sum's residual is the geometry's,
+  and the 4× supersample puts it under 0.4 px; what the RASTERISER may add is
+  the spec's 1 part in 10^5 of `uv`, which is in the tolerance by derivation
+  and was not before (see the trap).
 - `--area` displayed: only for the corner-free cases, and only with an integer
   softness width — which is stated, and which is why the diamond and the
   lattice are not in it.
 - `--flipflop`: yes — bitwise comparison of two renders of the same plugin.
-- What has NOT been proved: any of this on llvmpipe. CI has run on GitHub's
-  GPU-less macOS runner (Apple's software rasteriser, not llvmpipe), and there
-  `--area` **fails**: at 640×360, Vertical 1.504, Box 1.040, Box reversed 1.053
-  and Clock 1.086 px of continuous area off the fader against the one-pixel
-  tolerance, while their displayed areas are 0.28–0.49 px and every pattern
-  passes at 320×180. The other eight suites pass there. So on that evidence the
-  continuous check does depend on the rasteriser at 640×360; whether through the
-  2560×1440 supersampled reference or the bound is open question 7.
+- Apple's software renderer — what GitHub's GPU-less macOS runner falls back
+  to — is selectable on this Mac with `WPTEST_RENDERER=software`
+  (`kCGLPFARendererID` = `kCGLRendererGenericFloatID`), and it reproduces the
+  runner's numbers to the last printed digit. `tools/verify.sh` runs every
+  suite on it as well as on the GPU, so a check calibrated on the GPU fails
+  here first.
+- What has NOT been proved: any of this on llvmpipe (Mesa) or on a GPU other
+  than this Mac's.
 
 ---
 
@@ -167,6 +170,30 @@ towards A and narrowing every measured width by 1.7%. Two comparators of
 different gain at one level really do that on hardware. The shader now skips
 the second comparator when `BorderW` is 0. Found by `--edge`'s integral, which
 is why that check integrates rather than eyeballs.
+
+**The software renderer's `uv` is good to 1 part in 10^5, and 1e-5 of the
+picture is more than a pixel.** CI's first runs failed `--area` on GitHub's
+GPU-less macOS runner: Vertical, Box, Box reversed and Clock 1.04–1.50 px of
+continuous area off the fader at 640×360 against a one-pixel tolerance, while
+the displayed area stayed within 0.5 px and 320×180 passed. Reproduced here to
+the digit with `WPTEST_RENDERER=software`. Hard edges are exact there; soft
+edges are not, and a vertical wipe shows why: every column's key sums to the
+same wrong row — 1151.9906 for 1152 at 2560×1440 — and the key steps by
+exactly −0.031250417 a row instead of −1/32, so the renderer interpolates `uv.y`
+with a step 1.3e-5 too steep, not per-pixel noise. Swept over the fader,
+`uv.y` is off by up to 1.6e-6, 2.5e-6, 4.7e-6 and 9.0e-6 at 180, 360, 720 and
+1440 rows; `uv.x` by 1e-7; the GPU by 4e-8 in both. That is inside the GL
+spec's "about 1 part in 10^5", so the renderer is allowed it — and on a
+vertical wipe 1e-5 of the picture height, over the picture's width, is 2.3 px
+of area at 640×360. It scales with the supersampled reference's height, which
+is why the 2560×1440 figure failed and the 640×360 displayed one did not, and
+why 320×180 (one pixel = 1.7e-5 of the picture) passed. The check now adds
+that allowance, read off the key by the co-area formula (see "Every number"),
+with a negative control that every tolerance stays under a quarter-pixel shift
+of its own edge. The plugin was never wrong, and nothing in `source/` changed.
+(Computing `uv` from `gl_FragCoord` would dodge the interpolator, but it is
+still a GL float result under the same spec clause, and a plugin change needs
+a release.)
 
 **A soft box corner is not a ramp.** Summing a linear-clip ramp over pixel
 centres equals its integral exactly when the ramp's width is a whole number of
@@ -467,12 +494,11 @@ plugin builds were loading the CPU. Take the ceiling.
    it, at the cost of the closed form.
 6. **Does Arena ever call a mixer with one input?** Not seen on genlock or on
    Wipe; the guards stay.
-7. **Why does `--area` fail on the GPU-less runner at 640×360?** Four patterns
-   land 1.04–1.50 px of continuous area off the fader there (one-pixel
-   tolerance; worst 0.33 px on this Mac) and pass at 320×180. The continuous figure comes from a 2560×1440
-   supersampled render; whether that render or the bound is what differs on a
-   software rasteriser has not been looked at. Until it is, CI's macOS job is
-   red.
+7. ~~Why does `--area` fail on the GPU-less runner at 640×360?~~ **Answered:
+   the test was wrong, not the plugin.** Apple's software renderer interpolates
+   `uv.y` up to 9e-6 off (the GPU: 4e-8), inside the GL spec's 1 part in 10^5,
+   and the check had no room for it. See the trap "The software renderer's
+   `uv` is good to 1 part in 10^5".
 
 ---
 

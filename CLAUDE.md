@@ -49,6 +49,8 @@ of how an FFGL mixer behaves; the released copy with the Arena measurements is
 - Alternate transitions reverse: `./build/wptest --flipflop`
 - ms/frame, 720p through 4K, and the Area law's CPU cost: `./build/wptest --bench`
 - No dead controls: `python3 tools/sweep.py` (`--size WxH`, `--jobs N`)
+- Any check on Apple's software renderer, as the GPU-less CI runner gets it:
+  `WPTEST_RENDERER=software ./build/wptest --area` (verify.sh runs them all)
 
 Every check runs at 640x360 and 320x180 and carries its own negative control.
 

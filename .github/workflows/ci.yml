@@ -5,8 +5,6 @@ name: ci
 # structurally blind to, because macOS never links GLEW -- is caught before a
 # tag. There is no Linux job: the CMakeLists branches on APPLE and WIN32, and
 # Resolume has no Linux build.
-#
-# NOTE: this workflow has never run. The repo has no remote yet.
 on:
   push:
     branches: [main]
@@ -43,17 +41,14 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: The suites
-        # The runner has no GPU, so everything but --names falls back to
-        # software rasterisation.
-        #
-        # THIS HAS NEVER RUN, and it is the part most likely to need
-        # adjusting: four of six plugins in the last fleet round shipped
-        # numeric checks calibrated to this Mac's GPU that failed on a
-        # GPU-less runner, and in every case the test was wrong rather than
-        # the plugin. Every tolerance in wptest is derived from the GL
-        # spec's own guarantees instead -- see AGENTS.md, "Every number in
-        # the harness" -- but derived is not the same as proven, and a
-        # llvmpipe run is what would prove it.
+        # The runner has no GPU, so everything but --names runs on Apple's
+        # software renderer. Its interpolated uv is good only to the GL
+        # spec's 1 part in 10^5, and --area's first runs here failed until
+        # its tolerance allowed for that (AGENTS.md, the trap "The software
+        # renderer's uv is good to 1 part in 10^5"). tools/verify.sh runs
+        # the same suites on the same renderer locally, with
+        # WPTEST_RENDERER=software, so a check that would fail here fails
+        # there first.
         run: ctest --test-dir build --output-on-failure
 
       - name: Controls

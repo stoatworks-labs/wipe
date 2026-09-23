@@ -22,6 +22,9 @@
         wptest --bench                  ms/frame at 720p through 4K
         wptest --pipe                   raw frames in, raw frames out (two inputs)
 
+    WPTEST_RENDERER=software in the environment renders on Apple's software
+    renderer instead of the GPU: what a GPU-less CI runner gets.
+
     `--pipe` is the fleet's frame format with a second input. stdin is Dest,
     the layer below (A); `--pipe-src` is Src, this layer (B), from a file or
     FIFO:
@@ -67,6 +70,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
@@ -368,9 +372,26 @@ CGLContextObj createContext()
 		kCGLPFAAlphaSize, static_cast< CGLPixelFormatAttribute >( 8 ),
 		static_cast< CGLPixelFormatAttribute >( 0 )
 	};
+	//WPTEST_RENDERER=software asks for Apple's software renderer by id, on
+	//a Mac that has a GPU. It is what a GPU-less CI runner falls back to,
+	//so a check that fails only in CI can be reproduced here.
+	const CGLPixelFormatAttribute generic[] = {
+		kCGLPFAOpenGLProfile, static_cast< CGLPixelFormatAttribute >( kCGLOGLPVersion_GL4_Core ),
+		kCGLPFARendererID, static_cast< CGLPixelFormatAttribute >( kCGLRendererGenericFloatID ),
+		kCGLPFAColorSize, static_cast< CGLPixelFormatAttribute >( 24 ),
+		kCGLPFAAlphaSize, static_cast< CGLPixelFormatAttribute >( 8 ),
+		static_cast< CGLPixelFormatAttribute >( 0 )
+	};
 	CGLPixelFormatObj format = nullptr;
 	GLint formatCount        = 0;
-	if( CGLChoosePixelFormat( accelerated, &format, &formatCount ) != kCGLNoError || format == nullptr )
+	const char* renderer     = std::getenv( "WPTEST_RENDERER" );
+	if( renderer != nullptr && std::strcmp( renderer, "software" ) == 0 )
+	{
+		if( CGLChoosePixelFormat( generic, &format, &formatCount ) != kCGLNoError || format == nullptr )
+			return nullptr;
+		std::fprintf( stderr, "wptest: WPTEST_RENDERER=software, Apple's software renderer\n" );
+	}
+	else if( CGLChoosePixelFormat( accelerated, &format, &formatCount ) != kCGLNoError || format == nullptr )
 		if( CGLChoosePixelFormat( software, &format, &formatCount ) != kCGLNoError || format == nullptr )
 			return nullptr;
 	CGLContextObj context = nullptr;
@@ -1109,6 +1130,71 @@ int runEdge()
 //---------------------------------------------------------------------------
 // --area
 //---------------------------------------------------------------------------
+
+/// What the GL itself may move the B area by, in pixels of `image`: the
+/// rasteriser's allowance, not the plugin's.
+///
+/// The OpenGL 4.1 core spec (2.1.1, Floating-Point Computation) asks only
+/// that "individual results of floating-point operations are accurate to
+/// about 1 part in 10^5". The interpolated `uv` a fragment receives is such
+/// a result, so it may be off by kGLRelative x |uv| <= kGLRelative in each
+/// axis -- and an edge drawn from a waveform in uv moves by that much. An
+/// edge element with unit normal n, displaced by (ex, ey) picture-widths,
+/// sweeps |n.x ex W + n.y ey H| pixels of area per pixel of length, so the
+/// area can move by at most
+///
+///     kGLRelative x integral over the edge of ( |n.x| W + |n.y| H ) dl
+///
+/// and by the co-area formula that integral, averaged over the comparator's
+/// band, IS the sum over pixels of |dk/dx| W + |dk/dy| H: it is read off the
+/// rendered key with forward differences, so it needs no per-pattern
+/// perimeter formula and cannot drift from the geometry actually drawn.
+/// The comparator's own arithmetic is the same 1 part in 10^5 of a key that
+/// is at most 1, on every pixel inside the band. Returns image pixels.
+///
+/// Measured, it is not academic. Apple's GPU interpolates uv to about one
+/// float ULP (4e-8). Apple's SOFTWARE renderer -- what a GPU-less CI runner
+/// gets, and what WPTEST_RENDERER=software selects here -- lands uv.y up to
+/// 9e-6 off at 2560x1440 (uv.x stays at ~1e-7), and the error grows with the
+/// raster's height: 1.6e-6, 2.5e-6, 4.7e-6, 9.0e-6 at 180, 360, 720 and
+/// 1440 rows. Inside the spec's 1e-5, and on a vertical wipe 1e-5 of the
+/// picture is 2.3 px at 640x360 -- more than the one pixel the check allowed.
+constexpr double kGLRelative = 1e-5;
+
+double glAllowance( const ImageF& image, int width, int height )
+{
+	double edge = 0.0, band = 0.0;
+	for( int y = 0; y < height; ++y )
+		for( int x = 0; x < width; ++x )
+		{
+			const double k = channelF( image, width, x, y, 0 );
+			if( x + 1 < width )
+				edge += std::fabs( channelF( image, width, x + 1, y, 0 ) - k ) * width;
+			if( y + 1 < height )
+				edge += std::fabs( channelF( image, width, x, y + 1, 0 ) - k ) * height;
+			if( k > 0.0 && k < 1.0 )
+				band += 1.0;
+		}
+	return kGLRelative * ( edge + band );
+}
+
+/// The length of the edge in pixels of `image`, by the same co-area formula
+/// with the Euclidean gradient: the area a one-pixel shift of the whole edge
+/// would move. The resolution the check must keep.
+double edgeLength( const ImageF& image, int width, int height )
+{
+	double length = 0.0;
+	for( int y = 0; y + 1 < height; ++y )
+		for( int x = 0; x + 1 < width; ++x )
+		{
+			const double k  = channelF( image, width, x, y, 0 );
+			const double dx = channelF( image, width, x + 1, y, 0 ) - k;
+			const double dy = channelF( image, width, x, y + 1, 0 ) - k;
+			length += std::sqrt( dx * dx + dy * dy );
+		}
+	return length;
+}
+
 int runArea()
 {
 	std::printf( "in Area law the B area IS the fader, for every pattern\n\n" );
@@ -1154,9 +1240,17 @@ int runArea()
 		Rig rig, fine;
 		if( !rig.Init( W, H, true ) || !fine.Init( W * kSuper, H * kSuper, true ) )
 			return 1;
+		//The tolerance against the area a one-pixel shift of the same edge
+		//would move, worst over every case and position.
+		double coarsest = 0.0, coarsestTol = 0.0, coarsestLength = 0.0;
+		std::string coarsestName;
 		for( const Case& c : cases )
 		{
-			double worstDirect = 0.0, worstFine = 0.0;
+			//The worst position, judged as off / tolerance.
+			struct Measured
+			{
+				double ratio = 0.0, off = 0.0, tolerance = 1.0, gl = 0.0;
+			} onDirect, onFine;
 			for( int pass = 0; pass < 2; ++pass )
 			{
 				const bool super = pass == 1;
@@ -1181,23 +1275,50 @@ int runArea()
 				//supersample so the geometry is identical.
 				use.Set( "Softness", PxParamFor( 8.0 * ( super ? kSuper : 1 ) ) );
 				const double useArea = 1.0 / ( static_cast< double >( use.width ) * use.height );
-				double worst         = 0.0;
+				//Everything below in pixels of the TEST raster.
+				const double toTest = useArea / pixelArea;
+				Measured& m         = super ? onFine : onDirect;
 				for( double p : c.positions )
 				{
 					use.Set( "Opacity", static_cast< float >( p ) );
 					if( !use.Render( 0 ) )
 						return 1;
-					const double area = imageSum( use.PixelsF(), use.width, use.height ) * useArea;
-					worst             = std::max( worst, std::fabs( area - p ) / pixelArea );
+					const ImageF out    = use.PixelsF();
+					const double off    = std::fabs( imageSum( out, use.width, use.height ) * useArea - p ) / pixelArea;
+					const double gl     = glAllowance( out, use.width, use.height ) * toTest;
+					const double length = edgeLength( out, use.width, use.height ) / ( super ? kSuper : 1 );
+					//One pixel for the geometry and the quadrature, plus what
+					//the GL is allowed. Judged position by position: the
+					//allowance belongs to the picture it was read from.
+					const double tolerance = 1.0 + gl;
+					if( off / tolerance > m.ratio )
+						m = { off / tolerance, off, tolerance, gl };
+					if( tolerance / length > coarsest )
+					{
+						coarsest       = tolerance / length;
+						coarsestTol    = tolerance;
+						coarsestLength = length;
+						coarsestName   = c.name;
+					}
 				}
-				( super ? worstFine : worstDirect ) = worst;
 			}
+			const std::string worst = fmt( ": worst %.3f px of area off the fader, tolerance %.2f (1 + %.2f GL)", onFine.off, onFine.tolerance, onFine.gl );
 			if( c.direct )
-				Check( worstFine <= 1.0 && worstDirect <= 1.0,
-				       std::string( c.name ) + fmt( ": worst %.3f px of area off the fader (displayed: %.3f px)", worstFine, worstDirect ) );
+				Check( onFine.ratio <= 1.0 && onDirect.ratio <= 1.0,
+				       std::string( c.name ) + worst + fmt( "; displayed %.3f of %.2f", onDirect.off, onDirect.tolerance ) );
 			else
-				Check( worstFine <= 1.0, std::string( c.name ) + fmt( ": worst %.3f px of area off the fader (continuous only: corners)", worstFine ) );
+				Check( onFine.ratio <= 1.0, std::string( c.name ) + worst + " (continuous only: corners)" );
 		}
+
+		//The GL's allowance must not have bought the check its resolution.
+		//A one-pixel shift of the whole edge moves the area by the edge's
+		//length in pixels. The spec's allowance alone is 1e-5 x 640 = 0.006
+		//of that; with the one pixel of quadrature every tolerance must still
+		//be under a QUARTER-pixel shift of its own edge, so a solve that put
+		//the edge a quarter of a pixel wrong would fail.
+		Negative( coarsest < 0.25,
+		          std::string( "every tolerance is under a quarter-pixel shift of its own edge; coarsest " ) + coarsestName
+		              + fmt( ", %.2f px against %.1f px", coarsestTol, 0.25 * coarsestLength ) );
 
 		//Negative control: Edge law on the box does NOT give the fader's
 		//area, so this check tells the two laws apart.

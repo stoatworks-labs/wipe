@@ -15,6 +15,9 @@
 #                 area where Area law puts it, the soft edge and the border
 #                 following the waveform's slope, the modulator's sine, and
 #                 the flip-flop
+#   software      the same suites on Apple's software renderer, which is
+#                 what a GPU-less CI runner gets: a check calibrated on this
+#                 Mac's GPU fails here before it fails in CI
 #   sweep         does every control change the picture
 #   registration  does the bundle contain a plugin at all -- a file-scope
 #                 CFFGLPluginInfo nothing names, which a linker may drop
@@ -161,6 +164,24 @@ step "suites"
 for t in names mixer ends edge area softness border modulation flipflop; do
 	if "$WPTEST" --$t >/dev/null 2>&1; then pass "wptest --$t"; else fail "wptest --$t"; fi
 done
+
+#---------------------------------------------------------------------------
+# The same suites on Apple's SOFTWARE renderer, which is what GitHub's
+# GPU-less macOS runner falls back to. Its interpolated uv is good only to the
+# GL spec's 1 part in 10^5 (the GPU's is good to a float ULP), and --area
+# failed in CI on exactly that before its tolerance allowed for it. Running
+# here too means a check calibrated on this Mac's GPU fails on this Mac.
+#---------------------------------------------------------------------------
+step "software renderer"
+if [ "$(uname)" = "Darwin" ]; then
+	for t in mixer ends edge area softness border modulation flipflop; do
+		if WPTEST_RENDERER=software "$WPTEST" --$t >/dev/null 2>&1; then
+			pass "wptest --$t (software)"
+		else
+			fail "wptest --$t on the software renderer -- run: WPTEST_RENDERER=software $WPTEST --$t"
+		fi
+	done
+fi
 
 step "sweep"
 if python3 tools/sweep.py --binary "$WPTEST" --size 480x270 >/tmp/wipe-sweep.txt 2>&1; then
