@@ -108,6 +108,13 @@ so the footage is rendered by this repository's own offline harness
 (`wptest --pipe`, driven by a cue sheet) rather than filmed off a screen, and
 the clips are Resolume's bundled demo media.*
 
+**[Try it in your browser](https://wipe-demo.stoatworks-labs.com)** — the
+plugin's own wipe shader ported to WebGL2, with its pattern frame and both
+fader laws (the closed-form Area solve included) ported to JavaScript, wiping
+between two generated clips with every control. It is a port and not the
+plugin: read what
+[the page itself says it does not reproduce](https://wipe-demo.stoatworks-labs.com).
+
 ## The controls
 
 **Pattern** — Aspect Comp, Pattern, Reverse, Flip-Flop (reverse on alternate

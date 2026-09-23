@@ -51,6 +51,8 @@ of how an FFGL mixer behaves; the released copy with the Arena measurements is
 - No dead controls: `python3 tools/sweep.py` (`--size WxH`, `--jobs N`)
 - Any check on Apple's software renderer, as the GPU-less CI runner gets it:
   `WPTEST_RENDERER=software ./build/wptest --area` (verify.sh runs them all)
+- The browser demo's shaders are still the plugin's:
+  `python3 demo/tools/check_shaders.py` (verify.sh runs it)
 
 Every check runs at 640x360 and 320x180 and carries its own negative control.
 
@@ -100,6 +102,16 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
   `verify.sh`'s oxbow step assert it; Arena 7.27.1 confirmed it on Wipe
   (2026-09-23: the panel shows 25 of 26, and the missing one is Aspect Comp).
 - FFGL id is `WP01`. Display name `SW Wipe`.
+- `demo/` is the browser demo at wipe-demo.stoatworks-labs.com: the plugin's two
+  shaders unedited, `demo/waveform.js` a hand port of Controls.cpp, Waveform.cpp
+  and the modulator phase, `demo/area-worker.js` the lattice Area solves off the
+  main thread. A **mixer**: A is the kit's clip, B a second generated clip
+  (the transport's `Clip B`). `demo/vendor/` is the shared kit -- do not edit
+  it; it is copied in by `stoatworks-backend/resolume-demo/sync.sh wipe`.
+  Serve with `python3 -m http.server` in `demo/`; deploy from the repo root
+  with `cf-run npx wrangler deploy` (no build step; no CI deploys it). Change a
+  shader, Controls.cpp or Waveform.cpp and the demo needs the same change --
+  the checker catches only the shaders. See AGENTS.md, "The browser demo".
 
 ## Not done yet
 - **Never loaded into Resolume on macOS.** On Windows (Arena 7.27.1, llvmpipe,
@@ -112,8 +124,7 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
 - CI: the Windows DLL compiles with MSVC; the macOS job is red because
   `--area` fails at 640×360 on four patterns on the GPU-less runner (see
   AGENTS.md). The other eight suites pass there.
-- No `Size` control (dropped, see AGENTS.md), no presets, no OpenFX port, no
-  browser demo.
+- No `Size` control (dropped, see AGENTS.md), no presets, no OpenFX port.
 
 ## Diagnostics
 

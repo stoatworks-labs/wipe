@@ -505,6 +505,88 @@ plugin builds were loading the CPU. Take the ceiling.
 
 ---
 
+## The browser demo
+
+**<https://wipe-demo.stoatworks-labs.com>**, served from `demo/` by this repo's
+own Worker (`wrangler.toml`). Built 2026-09-24 on the shared kit
+(`stoatworks-backend/resolume-demo`, vendored into `demo/vendor/`), the first
+**mixer** in the suite.
+
+**What runs for real.** The plugin's two shaders, `kVertexShader` and
+`kWipeShader`, copied into `demo/plugin.js` unedited and compiled by the kit's
+`port()` (the version line and precision qualifiers, nothing else) into
+WebGL2. `demo/tools/check_shaders.py` compares them with `source/Shaders.cpp`
+character for character and `tools/verify.sh` runs it; one changed character in
+the comparator fails it (run 2026-09-24). The one escape is the backtick around
+`soft` in a comment, which the checker decodes; any other backslash is refused.
+
+**What is a port, checked by nobody but a reader.** `demo/waveform.js` is
+Controls.cpp (every `...FromParam`, float32-rounded as the plugin's floats are),
+Waveform.cpp (`Derive`, `EdgeLevel`, and the whole Area law: half-plane,
+polygon, disc and wedge clipping, the lattice preparation, the adaptive Simpson
+band integral and the 60-step bisection) and Timing.cpp's `ModPhase`.
+`demo/plugin.js` carries `ProcessOpenGL`'s Flip-Flop state machine and area
+cache and sets every uniform the plugin sets. A self-consistency run of the port
+in Node (every pattern, 1×1 / 3×2 / 8×8, softness 0 / 32 / 64 px, both
+directions) puts `SoftArea(AreaLevel(p))` within 6e-11 of p, except the hard
+matrix, which is quantised to one cell of 576 as the C++ is. That is the port
+agreeing with itself, not with the C++: no C++-vs-JS comparison exists.
+`MatrixRank` is not ported — the Feistel order runs in the shader only, as in
+the plugin.
+
+**Decisions taken without asking:**
+
+- **Two inputs from one kit.** The kit hands a demo one input. A (the layer
+  below, `inputTextures[0]`) is the kit's clip, relabelled `Clip A`, and the only
+  one "Use my own…" replaces. B (this layer) is a second `SourceRenderer` from the
+  kit's own `sources.js`, at the same raster and on the same clock, picked by
+  the kit's one extra transport dropdown (`demo.variants`, labelled `Clip B`).
+  That dropdown exists for "which bundle"; Wipe ships one bundle, and B is
+  transport, not a parameter the plugin declares, so it must not be in the
+  inspector. Defaults: A colour bars, B the geometry card. Done in the page, not
+  the kit, because this is the first mixer; a second one is the moment to teach
+  the kit two inputs.
+- **Opacity is a slider**, in the Fader group where the plugin declares it. In
+  Arena it is the layer's opacity fader and the mixer's own control is
+  overridden; the banner and the disclosure say so. There is no auto-fader —
+  Resolume's transitions are the host's, not the plugin's.
+- **Aspect Comp is shown**, although Arena hides a mixer's parameter 0: a
+  browser does not, and hiding it would be inventing a host behaviour.
+- **Multiple H / V are dropdowns** of 1..8 (FF_TYPE_INTEGER; the kit has no
+  integer control — galvo's answer).
+- **Both MaxUVs are 1**: the page's textures are unpadded, so the per-input
+  MaxUV the `--mixer` check exists for has nothing to correct here. Disclosed.
+  A visitor's own file does arrive at its own size, so the two HalfTexel clamps
+  then differ, as they do in Resolume.
+- **The lattice Area solve runs in a worker** (`demo/area-worker.js`). A
+  Box/Diamond/Circle with a Multiple above 1 and the soft edge up costs the port
+  0.6 to 2.4 s a solve in Node on this Mac, and a solve per slider event froze
+  the page. The plugin blocks its render thread; the page draws with the last
+  level it has until the answer lands, and the stats line says "solving".
+  Everything else solves in line and caches on the same inputs as the plugin.
+  (How fast the C++ is at 8×8 with softness is its `--bench`'s business; the
+  page makes no claim about it.)
+- **A statistics line under the picture** reports the level the plugin's code
+  chose and the B area read back out of the plugin's own `SoftArea` at that
+  level — so Edge law visibly gives an area that is not the fader and Area law
+  one that is. The plugin draws no such thing; the disclosure says so.
+- **The clock** is the page's, in seconds, straight into `ModPhase`. The plugin's
+  unit detection (Resolume sends milliseconds) and frame-relative epoch are host
+  plumbing and are not exercised.
+- **Absent:** the About block (a web page has links of its own). Wipe has no
+  audio path, so nothing is missing for want of one.
+- **Presets** are only combinations of the plugin's own parameters.
+
+**Verified 2026-09-24** headlessly (Chrome + SwiftShader through
+`stoatworks-backend/release/cdpshot.py`'s Chrome class): no console errors or
+warnings; Pattern Horizontal → Circle changes the canvas by a mean 40 levels
+against 0.05 for motion alone; Edge law's circle at fader 0.5 reports 74.05 %
+B and Area law 50.00 %; Flip-Flop counts transitions and the reversed box
+reads 30 % B at a 30 % fader where the forward one reads 16 %. Deploy with
+`cf-run npx wrangler deploy` from the repo root; no CI job deploys it.
+
+---
+
 ## Notes
 
 Cross-cutting fleet knowledge lives in
