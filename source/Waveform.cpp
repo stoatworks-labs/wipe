@@ -209,19 +209,65 @@ double wedgeArea( const Poly& region, double a0, double a1 )
 }
 
 //---------------------------------------------------------------------------
+// The geometry that does not depend on the level, built once per solve: the
+// picture in q, its bounds, and for the lattice patterns every cell that
+// meets the picture, already clipped to it. The solve evaluates the area a
+// few hundred times and the lattice can hold a hundred cells, so clipping
+// them on every evaluation was most of the cost.
+//---------------------------------------------------------------------------
+struct Prepared
+{
+	Poly picture;
+	double qxmin = 0, qxmax = 0, qymin = 0, qymax = 0;
+	struct Cell
+	{
+		Poly region;
+		Pt centre;
+	};
+	std::vector< Cell > cells;
+};
+
+Prepared prepare( const Frame& frame, const Derived& d )
+{
+	Prepared p;
+	p.picture = picturePoly( d );
+	boundsOf( p.picture, p.qxmin, p.qxmax, p.qymin, p.qymax );
+	const bool lattice = ( frame.pattern == PAT_BOX || frame.pattern == PAT_DIAMOND || frame.pattern == PAT_CIRCLE )
+	                     && ( frame.multipleH > 1 || frame.multipleV > 1 );
+	if( lattice )
+	{
+		const double nh = frame.multipleH, nv = frame.multipleV;
+		const int imin  = static_cast< int >( std::floor( p.qxmin * nh ) ) - 1;
+		const int imax  = static_cast< int >( std::ceil( p.qxmax * nh ) ) + 1;
+		const int jmin  = static_cast< int >( std::floor( p.qymin * nv ) ) - 1;
+		const int jmax  = static_cast< int >( std::ceil( p.qymax * nv ) ) + 1;
+		for( int j = jmin; j <= jmax; ++j )
+			for( int i = imin; i <= imax; ++i )
+			{
+				Poly cell = clipHalf( p.picture, 1.0, 0.0, ( i + 0.5 ) / nh );
+				cell      = clipHalf( cell, -1.0, 0.0, -( i - 0.5 ) / nh );
+				cell      = clipHalf( cell, 0.0, 1.0, ( j + 0.5 ) / nv );
+				cell      = clipHalf( cell, 0.0, -1.0, -( j - 0.5 ) / nv );
+				if( cell.size() >= 3 && polyArea( cell ) > 0.0 )
+					p.cells.push_back( { cell, { i / nh, j / nv } } );
+			}
+	}
+	return p;
+}
+
+//---------------------------------------------------------------------------
 // The hard area, in the un-reversed waveform.
 //---------------------------------------------------------------------------
-double hardAreaRaw( const Frame& frame, const Derived& d, double level )
+double hardAreaRaw( const Frame& frame, const Derived& d, const Prepared& pre, double level )
 {
 	if( level <= d.wMin )
 		return 0.0;
 	if( level >= d.wMax )
 		return 1.0;
 
-	const Poly picture  = picturePoly( d );
+	const Poly& picture = pre.picture;
 	const double detInv = 1.0 / d.scaleX;//q area to picture area
-	double qxmin, qxmax, qymin, qymax;
-	boundsOf( picture, qxmin, qxmax, qymin, qymax );
+	const double qxmin = pre.qxmin, qxmax = pre.qxmax, qymin = pre.qymin, qymax = pre.qymax;
 
 	switch( frame.pattern )
 	{
@@ -262,25 +308,13 @@ double hardAreaRaw( const Frame& frame, const Derived& d, double level )
 		if( frame.multipleH == 1 && frame.multipleV == 1 )
 			return shapeArea( frame.pattern, picture, { 0.0, 0.0 }, size ) * detInv;
 
-		const double nh = frame.multipleH, nv = frame.multipleV;
-		const int imin  = static_cast< int >( std::floor( qxmin * nh ) ) - 1;
-		const int imax  = static_cast< int >( std::ceil( qxmax * nh ) ) + 1;
-		const int jmin  = static_cast< int >( std::floor( qymin * nv ) ) - 1;
-		const int jmax  = static_cast< int >( std::ceil( qymax * nv ) ) + 1;
-		double sum      = 0.0;
-		for( int j = jmin; j <= jmax; ++j )
-			for( int i = imin; i <= imax; ++i )
-			{
-				//The cell, intersected with the picture first: the wrap keeps
-				//each copy inside its own cell.
-				Poly cell = clipHalf( picture, 1.0, 0.0, ( i + 0.5 ) / nh );
-				cell      = clipHalf( cell, -1.0, 0.0, -( i - 0.5 ) / nh );
-				cell      = clipHalf( cell, 0.0, 1.0, ( j + 0.5 ) / nv );
-				cell      = clipHalf( cell, 0.0, -1.0, -( j - 0.5 ) / nv );
-				if( cell.size() < 3 )
-					continue;
-				sum += shapeArea( frame.pattern, cell, { i / nh, j / nv }, size );
-			}
+		//Each copy inside its own cell (the wrap keeps it there), and each
+		//cell already clipped to the picture.
+		double sum = 0.0;
+		for( const Prepared::Cell& cell : pre.cells )
+			sum += shapeArea( frame.pattern, cell.region, cell.centre, size );
+		( void )qymin;
+		( void )qymax;
 		return sum * detInv;
 	}
 
@@ -314,11 +348,11 @@ double hardAreaRaw( const Frame& frame, const Derived& d, double level )
 	}
 }
 
-double hardArea( const Frame& frame, const Derived& d, double level )
+double hardArea( const Frame& frame, const Derived& d, const Prepared& pre, double level )
 {
 	if( frame.reverse )
-		return 1.0 - hardAreaRaw( frame, d, d.wMin + d.wMax - level );
-	return hardAreaRaw( frame, d, level );
+		return 1.0 - hardAreaRaw( frame, d, pre, d.wMin + d.wMax - level );
+	return hardAreaRaw( frame, d, pre, level );
 }
 
 //---------------------------------------------------------------------------
@@ -331,9 +365,10 @@ struct AreaFn
 {
 	const Frame& frame;
 	const Derived& d;
+	const Prepared& pre;
 	double operator()( double l ) const
 	{
-		return hardArea( frame, d, l );
+		return hardArea( frame, d, pre, l );
 	}
 };
 
@@ -355,7 +390,7 @@ double simpson( const AreaFn& f, double a, double b, double eps )
 {
 	const double fa = f( a ), fb = f( b ), fm = f( 0.5 * ( a + b ) );
 	const double whole = ( b - a ) / 6.0 * ( fa + 4.0 * fm + fb );
-	return simpsonRec( f, a, b, fa, fm, fb, whole, eps, 40 );
+	return simpsonRec( f, a, b, fa, fm, fb, whole, eps, 24 );
 }
 
 //---------------------------------------------------------------------------
@@ -513,15 +548,12 @@ double EdgeLevel( const Derived& d, double position )
 	return d.wMin + std::clamp( position, 0.0, 1.0 ) * ( d.wMax - d.wMin );
 }
 
-double HardArea( const Frame& frame, const Derived& d, double level )
+namespace
 {
-	return hardArea( frame, d, level );
-}
-
-double SoftArea( const Frame& frame, const Derived& d, double level, double softW )
+double softArea( const Frame& frame, const Derived& d, const Prepared& pre, double level, double softW )
 {
 	if( !( softW > 0.0 ) )
-		return hardArea( frame, d, level );
+		return hardArea( frame, d, pre, level );
 
 	if( frame.pattern == PAT_MATRIX )
 	{
@@ -539,21 +571,35 @@ double SoftArea( const Frame& frame, const Derived& d, double level, double soft
 		return frame.reverse ? 1.0 - area : area;
 	}
 
-	const AreaFn f { frame, d };
+	const AreaFn f { frame, d, pre };
 	const double a = level - 0.5 * softW, b = level + 0.5 * softW;
-	return simpson( f, a, b, 1e-12 ) / softW;
+	//1e-10 on the band's integral is 1e-10/softW on the mean, under 1e-8
+	//at the softest setting: a tenth of a pixel of area at 4K.
+	return simpson( f, a, b, 1e-10 ) / softW;
+}
+} // namespace
+
+double HardArea( const Frame& frame, const Derived& d, double level )
+{
+	return hardArea( frame, d, prepare( frame, d ), level );
+}
+
+double SoftArea( const Frame& frame, const Derived& d, double level, double softW )
+{
+	return softArea( frame, d, prepare( frame, d ), level, softW );
 }
 
 double AreaLevel( const Frame& frame, const Derived& d, double position, double softW )
 {
-	const double p = std::clamp( position, 0.0, 1.0 );
-	double lo      = d.wMin - 0.5 * std::max( softW, 0.0 );
-	double hi      = d.wMax + 0.5 * std::max( softW, 0.0 );
-	//SoftArea is 0 at lo and 1 at hi and monotone between: bisect.
+	const Prepared pre = prepare( frame, d );
+	const double p     = std::clamp( position, 0.0, 1.0 );
+	double lo          = d.wMin - 0.5 * std::max( softW, 0.0 );
+	double hi          = d.wMax + 0.5 * std::max( softW, 0.0 );
+	//softArea is 0 at lo and 1 at hi and monotone between: bisect.
 	for( int i = 0; i < 60 && ( hi - lo ) > kAreaSolveTolerance; ++i )
 	{
 		const double mid = 0.5 * ( lo + hi );
-		if( SoftArea( frame, d, mid, softW ) < p )
+		if( softArea( frame, d, pre, mid, softW ) < p )
 			lo = mid;
 		else
 			hi = mid;
