@@ -133,6 +133,7 @@ different sizes, with different hardware padding, rendered to a third size.
     ./build/wptest --modulation             the wobble is the stated sine, and it travels
     ./build/wptest --flipflop               alternate transitions reverse
     ./build/wptest --bench                  720p through 4K
+    ./build/wptest --pipe --pipe-src F      two raw RGBA streams in, frames out (filming, not a check)
     python3 tools/sweep.py                  no control is silently dead
     tools/verify.sh                         all of it, on a fresh universal build
 

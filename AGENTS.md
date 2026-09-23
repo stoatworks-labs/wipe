@@ -104,6 +104,7 @@ systematic and does not average out.
 | `--modulation` shape | RMS residual **0.02 px** | After removing the fitted sine; a triangle wave would leave 1.6 px. Measured 0.0000. Negative control: at 3 cycles the projection is 0. |
 | `--modulation` travel | **0.02/16 rad** | The edge moves by −m sin( 2πfv − 2πφ ), so its fitted phase is π − 2πφ and a quarter second at 1 Hz is −π/2 = 3π/2 mod 2π. Asserted against that AND against the plugin's own reduced phase (0.250000). |
 | `--flipflop` | **zero bytes**, four transitions | Each arrival at an end from the other end flips the direction; the box after an odd transition is the Reverse-on box bitwise, after an even one the Reverse-off box. The first arrival counts for nothing; with Flip-Flop off nothing counts. |
+| `--pipe` | not asserted | A filming mode in genlock's shape (`gltest --pipe`, e10444b): stdin is A, `--pipe-src` B, cues through the plugin's own setter, `SetTime` in milliseconds as Arena sends it. Verified by an ffmpeg round trip at 640×360 with B from a FIFO at 480×270: an `Opacity` ramp 0→1 opens a circle from all-A to all-B, a held Opacity with Mod Amount on changes the picture frame to frame (the clock moves), 2.5 frames on stdin give 2 out, and a misspelled cue is refused. |
 | `--bench` | not asserted | No threshold is worth asserting on somebody else's GPU. The Area-law solve is timed beside it because it is the one cost that is not trivial. |
 
 **Negative controls actually run, on the committed tree (2026-09-23):**

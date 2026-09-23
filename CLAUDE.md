@@ -26,6 +26,15 @@ of how an FFGL mixer behaves; the released copy with the Arena measurements is
   Clock, Matrix; Law 0 Edge, 1 Area)
 - Drive the fader to alternate ends first: `--transitions N` (for Flip-Flop)
 - List parameters: `./build/wptest --list`
+- Film through it (the fleet's `--pipe` format, with a second input):
+  `ffmpeg … -f rawvideo -pix_fmt rgba - | ./build/wptest --pipe --size WxH
+  [--pipe-src FILE_OR_FIFO] [--src-size WxH] [--fps N] [--script cues.txt] |
+  ffmpeg -f rawvideo -pix_fmt rgba -s WxH -i - out.mov`. stdin is A (the layer
+  below), `--pipe-src` is B (this layer; without it `--input-b` is held).
+  Cues are `frame Name value`, value in the parameter's host units (0..1;
+  the option index; Multiples 1..8), linear between keys; unknown names and
+  the About block are refused. The clock is SetTime in **ms**, frame-relative,
+  as Arena sends it. A partial frame at EOF ends the run.
 
 ## Verify
 - Everything: `tools/verify.sh` (fresh universal build + every check, ~1 min)
