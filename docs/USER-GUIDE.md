@@ -37,7 +37,8 @@ harness, not captured from Resolume.*
 ## Installing
 
 Download the build for your platform. For macOS there is a universal `.dmg` or
-`.zip` (Apple silicon and Intel), and for Windows an x64 installer or `.zip`. Every download
+`.zip` (Apple silicon and Intel), **Developer ID-signed and notarised** so the bundle
+simply loads, and for Windows an x64 installer or `.zip`. Every download
 carries one mixer, **SW Wipe**. Put it in Resolume's FFGL folder, then restart
 Resolume:
 
