@@ -59,9 +59,9 @@ public:
 	}
 
 	/// Whether the host has ever called SetTime, and what it last said. Only
-	/// the diagnostics log reads these: whether a host drives a MIXER's clock
-	/// at all is one of the things about mixers nobody here has been able to
-	/// measure, and the log is where that gets answered.
+	/// the diagnostics log reads these. Resolume Arena 7.27.1 drives a MIXER's
+	/// clock every frame, in milliseconds (measured on genlock); whether it
+	/// does the same for this one is what the log would confirm.
 	bool Observed() const
 	{
 		return raw_ >= 0.0;

@@ -4,8 +4,10 @@
 wipes the way a 1970s vision mixer did: from waveforms and a comparator, not
 from pictures. C++17 + GLSL 4.10, CMake, universal macOS `.bundle` and a
 Windows `.dll`. MIT. Intended home `github.com/stoatworks-labs/wipe`; **it is
-not there yet** — v0.1.0 is local, unreleased and has never been in front of
-Resolume.
+not there yet** — v0.1.0 is local, unreleased, and Wipe itself has never been
+in front of Resolume. genlock, the fleet's first mixer, has (Arena 7.27.1,
+Windows, 2026-09-23), and this build was corrected to what that session
+measured — see "What genlock measured in Arena" below.
 
 `CLAUDE.md` is the command reference. This file is the *why*: the idea, every
 number in the harness and where it comes from, the traps this build actually
@@ -14,8 +16,10 @@ asking.
 
 For how an FFGL mixer behaves at the ABI — the type being one argument, the
 input count being a separate declaration, which base class and why, what
-Resolume does and does not do — read **`~/dev/genlock/AGENTS.md`**. Nothing
-here contradicts it; what this build learned *beyond* it is under "The traps".
+Resolume does and does not do — read genlock's `AGENTS.md`
+(**`~/Projects/resolume/genlock/AGENTS.md`**, the released repo; `~/dev/genlock`
+is an older local copy that predates the Arena run). Nothing here contradicts
+it; what this build learned *beyond* it is under "The traps".
 
 ---
 
@@ -319,6 +323,28 @@ assumptions. It can be added later without moving anything.
 
 ---
 
+## What genlock measured in Arena
+
+genlock v0.1.0 was set as a layer's Blend Mode in **Resolume Arena 7.27.1**
+(build 15990) on win-lab — Windows x64, Mesa llvmpipe, no GPU — through Arena's
+REST API on 2026-09-23, and its own log read back. What that established about
+*any* FFGL mixer, and what Wipe changed because of it:
+
+| Measured on genlock | What Wipe does about it |
+|---|---|
+| Mixers load from **Extra Effects**; there is no Extra Mixers | Install path, README, CLAUDE, CMake and the release workflow now say Extra Effects |
+| Registered as category 2 and chosen in a layer's **Blend Mode** list (the same list serves transitions) | The docs say how to pick it |
+| Both inputs arrive **padded** (1280×720 of 1280×768) | Nothing: one MaxUV per input was already the design, and `--mixer` checks it |
+| `SetTime` **every frame, in milliseconds**; `SetBeatInfo` every frame | Nothing: the clock already votes its unit; `--pipe` drives milliseconds like Arena |
+| A parameter named **`Opacity` is bound to the layer's opacity fader**; REST writes to the mixer's own are overridden | The fader was renamed `Position` → `Opacity` |
+| **The mixer's first parameter is not exposed** (genlock's Key Source, id 0) | `Aspect Comp`, default on, moved to index 0 |
+| No one-input call observed while the layer below was cleared and refilled | The guards stay; not proven never |
+| No mixer frame can be grabbed over REST | Nothing claims a picture inside Resolume |
+
+None of this has been re-run with Wipe.
+
+---
+
 ## What is genuinely verified, and what is assumed
 
 **Verified, by measurement, on this machine (Apple M4 Max, macOS 26.4.1),
@@ -358,9 +384,12 @@ plugin builds were loading the CPU. Take the ceiling.
 
 **Assumed, or not yet done:**
 
-- **Never loaded into Resolume.** Not once. Every host claim — the `Opacity` binding, one-input calls while patching, whether a mixer gets
-  `SetTime` (the modulator's travel needs it) — is inherited from genlock's
-  list of unknowns, not measured.
+- **Wipe has never been loaded into Resolume.** Not once, on either platform.
+  Its host behaviour is inferred from genlock's Arena session (below), not
+  measured on Wipe: in particular that `Aspect Comp`, not something else, is
+  what Arena hides, that the layer's opacity fader reaches `Opacity`, and that
+  the modulator travels on Arena's millisecond clock. No mixer's picture has
+  been looked at inside Resolume, and nothing on macOS at all.
 - **Never run on another rasteriser.** The tolerances are derived and the
   "would this hold" list above is argued, not proved. CI has never run.
 - **Windows has never been compiled.**
@@ -387,8 +416,10 @@ plugin builds were loading the CPU. Take the ceiling.
 3. **Should softness be a fraction of the picture rather than pixels?** The
    hardware's softness was a fraction of the line time. Pixels is what the
    spec asked for, and it means a 4K edge is half the width of a 1080p one.
-4. **Does a mixer get `SetTime`?** If not, the modulator never travels in
-   Resolume and `Mod Speed` is dead in the host while alive in the harness.
+4. ~~Does a mixer get `SetTime`?~~ **Yes, answered on genlock**: every frame,
+   in milliseconds since Arena started. `timing::Clock` votes the unit and
+   works frame-relative, so `Mod Speed` should travel in Resolume; not yet
+   seen on Wipe.
 5. **Is the Area-law solve fast enough on a slow CPU at Multiple 8×8?** 7.8 ms
    here on the render thread; a table per (pattern, multiples) would remove
    it, at the cost of the closed form.

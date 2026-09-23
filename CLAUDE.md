@@ -2,11 +2,13 @@
 
 A vision mixer's analogue pattern generator as an FFGL **mixer** for Resolume
 Arena/Avenue. C++/GLSL, CMake MODULE → universal `.bundle` (macOS) + Windows
-`.dll`. MIT. Not yet public, not yet released, never loaded into Resolume.
+`.dll`. MIT. Not yet public, not yet released, never itself loaded into
+Resolume (genlock, the first mixer, has been).
 
 Read `AGENTS.md` before changing the waveforms, the level laws, or any
 tolerance in the harness. Read `~/dev/genlock/AGENTS.md` (the fleet's account
-of how an FFGL mixer behaves) before touching `ProcessOpenGL`.
+of how an FFGL mixer behaves; the released copy with the Arena measurements is
+`~/Projects/resolume/genlock/AGENTS.md`) before touching `ProcessOpenGL`.
 
 ## Commands (CMake)
 - Configure: `cmake -B build -DCMAKE_BUILD_TYPE=Release`
@@ -88,8 +90,11 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
 - FFGL id is `WP01`. Display name `SW Wipe`.
 
 ## Not done yet
-- Never loaded into Resolume, on any platform. Never run on any rasteriser but
-  this Mac's. Windows never compiled.
+- Wipe itself never loaded into Resolume, on any platform. What it assumes
+  about the host (Extra Effects, Blend Mode, `Opacity` bound to the layer's
+  fader, parameter 0 hidden, `SetTime` in ms every frame) was measured on
+  genlock in Arena 7.27.1 on Windows, not on Wipe. Never run on any rasteriser
+  but this Mac's. Windows never compiled.
 - No release tag, no remote, not registered on the website. `StoatworksAbout.h`
   and `ATTRIBUTIONS.md` are provisional hand copies.
 - No `Size` control (dropped, see AGENTS.md), no presets, no OpenFX port, no

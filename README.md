@@ -9,10 +9,11 @@
 > every pattern's B area within **0.33 px** of the fader in Area law, a circle's
 > soft edge widening towards its centre **exactly as the parabola predicts**
 > (41.855 px measured, 41.855 predicted), the modulator's sine recovered to
-> **16.0000 px** of 16 (see [Status](#status)). It has **never been loaded into
-> Resolume**, on any platform — not once. It is the fleet's second FFGL
-> *mixer*, and several things about how a host treats one are still guesses.
-> Check it in your own rig before trusting it in a show.
+> **16.0000 px** of 16 (see [Status](#status)). Wipe itself has **never been
+> loaded into Resolume**, on any platform — not once. It is the fleet's second
+> FFGL *mixer*; the first, genlock, has been measured in Resolume Arena 7.27.1,
+> and Wipe is built to what that session found. Check it in your own rig before
+> trusting it in a show.
 
 A 1970s vision mixer's analogue pattern generator, as an FFGL **mixer** for
 [Resolume](https://resolume.com) Arena and Avenue.
@@ -163,18 +164,23 @@ M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 | Mutation test | one character of the shipped GLSL (the comparator's 0.5 → 0.6) fails **five** checks; the circle built from \|H\|+\|V\| fails `--softness`; one MaxUV for both inputs fails `--mixer` |
 | No dead controls | all **21** sweepable of the 25 parameters change the picture; the other four are the About buttons |
 | macOS binary | universal (`x86_64 arm64`), exports `plugMain`, ad-hoc signs |
-| Host metadata | `oxbow probe` reads **SW Wipe / WP01 / mixer / inputs 2..2** |
+| Host metadata | `oxbow probe` reads **SW Wipe / WP01 / mixer / inputs 2..2**, parameter 0 **Aspect Comp** |
 | Render cost | **0.03 ms/frame at 720p, 0.04 at 1080p, 0.12 at 4K** (0.7% of a 60 fps frame), worst of several runs. Area law adds a CPU solve on the frames where something changed: under 0.06 ms for any single pattern, **2.8 ms for a box at Multiple 8×8 and 7.8 ms for a circle** on a quiet machine (6.9 and 16.9 with other builds loading the CPU) |
 
 Run `tools/verify.sh` before believing any of it.
 
-**Not done, and the honest list is long.** It has **never been loaded into
-Resolume** — not on macOS, not on Windows, not once — so every mixer-specific
-claim about the *host* is a guess: that Resolume reads mixers from Extra
-Mixers, whether it binds a parameter named `Opacity` to the layer's opacity fader
-(this plugin's fader is called `Opacity` so that it does), whether it
-calls a mixer with one input while the operator is patching, and whether it
-drives a mixer's clock, which the modulator's travel depends on. The
+**Not done, and the honest list is long.** Wipe has **never been loaded into
+Resolume** — not on macOS, not on Windows, not once. What it knows about how
+Resolume treats a mixer comes from **genlock**, the fleet's first, which was
+measured in Resolume Arena 7.27.1 on Windows (software rendering, 2026-09-23):
+Arena loads mixers from **Extra Effects** and offers them as a layer's **Blend
+Mode**; it hands both inputs **padded** (1280×720 of 1280×768); it calls
+`SetTime` **every frame, in milliseconds**, so the modulator will travel; it
+binds a parameter named **`Opacity` to the layer's opacity fader**, which is
+why Wipe's fader carries that name; and it **does not show a mixer's first
+parameter**, which is why Wipe's is Aspect Comp. None of that has been
+re-checked with Wipe itself, whether Arena ever calls a mixer with one input
+is still open, and nobody has looked at a mixer's picture inside Resolume. The
 **Windows build has never been compiled**; CI exists and has never run,
 because there is no remote. Nothing has run on a **rasteriser other than this
 Mac's**. The spec's `Size` control was dropped, for a stated reason. Area law
