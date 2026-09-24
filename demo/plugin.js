@@ -555,6 +555,9 @@ function createRenderer(gl, quad) {
 //===========================================================================
 const mounted = mountDemo({
   name: 'Wipe',
+  // The FFGL type the plugin registers (PluginInfo), for the kit banner's
+  // closing sentence, which said "effect" on every page until 2026-09-24.
+  kind: 'mixer',
   pluginId: 'WP01',
   tagline:
     'A 1970s vision mixer’s analogue pattern generator, as an FFGL mixer. Every wipe is a waveform — ramps and parabolas combined in a small matrix — and a comparator against the fader. Softness is the comparator’s gain, so a circle’s edge is softer near its middle where the parabola is flatter; the border is a second comparator; modulation is a sine on the waveform.',
