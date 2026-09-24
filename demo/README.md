@@ -41,8 +41,8 @@ python3 tools/check_shaders.py       # the copies still match the C++
 ```
 
 There is no build step. It is hand-written ES modules and what is committed is
-what is served. Deploy from the repo root with `cf-run npx wrangler deploy`,
-and verify by content:
+what is served. A push to main deploys it (`.github/workflows/deploy.yml`);
+by hand, `cf-run npx wrangler deploy` from the repo root. Verify by content:
 `curl -s 'https://wipe-demo.stoatworks-labs.com/?cb=1' | grep -o '<title>[^<]*'`.
 
 **After changing a shader in `source/Shaders.cpp`, copy it across here too** —

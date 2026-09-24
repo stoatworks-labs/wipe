@@ -583,7 +583,9 @@ warnings; Pattern Horizontal → Circle changes the canvas by a mean 40 levels
 against 0.05 for motion alone; Edge law's circle at fader 0.5 reports 74.05 %
 B and Area law 50.00 %; Flip-Flop counts transitions and the reversed box
 reads 30 % B at a 30 % fader where the forward one reads 16 %. Deploy with
-`cf-run npx wrangler deploy` from the repo root; no CI job deploys it.
+`cf-run npx wrangler deploy` from the repo root, or push to main:
+`.github/workflows/deploy.yml` (idler's, added the same day) deploys `demo/`
+and checks the live `<head>` is this build.
 
 ---
 

@@ -109,7 +109,8 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
   (the transport's `Clip B`). `demo/vendor/` is the shared kit -- do not edit
   it; it is copied in by `stoatworks-backend/resolume-demo/sync.sh wipe`.
   Serve with `python3 -m http.server` in `demo/`; deploy from the repo root
-  with `cf-run npx wrangler deploy` (no build step; no CI deploys it). Change a
+  with `cf-run npx wrangler deploy` (no build step); `.github/workflows/deploy.yml`
+  also ships it on every push to main that touches more than docs. Change a
   shader, Controls.cpp or Waveform.cpp and the demo needs the same change --
   the checker catches only the shaders. See AGENTS.md, "The browser demo".
 
