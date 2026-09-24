@@ -37,8 +37,8 @@ the offline harness, not captured from Resolume.</sub>
 
 | Build | Download | Size |
 | --- | --- | --- |
-| Universal (Apple Silicon + Intel) · .dmg disk image | [`wipe-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/wipe/releases/download/v0.1.0/wipe-0.1.0-macos-universal.dmg) | 202 KB |
-| Universal (Apple Silicon + Intel) · .zip archive | [`wipe-macos-universal.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-macos-universal.zip) | 158 KB |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`wipe-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/wipe/releases/download/v0.1.0/wipe-0.1.0-macos-universal.dmg) | 212 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`wipe-macos-universal.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-macos-universal.zip) | 176 KB |
 
 </details>
 
@@ -54,7 +54,7 @@ the offline harness, not captured from Resolume.</sub>
 
 All builds, checksums and release notes: [github.com/stoatworks-labs/wipe/releases](https://github.com/stoatworks-labs/wipe/releases).
 
-The Windows builds are unsigned, so SmartScreen warns once.
+macOS builds are signed and notarised and open normally. The Windows builds are unsigned, so SmartScreen warns once.
 
 <!-- downloads:end -->
 
