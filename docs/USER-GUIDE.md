@@ -356,7 +356,10 @@ and an error line if the shader failed to compile.
 - **Area law with the modulator on** gives the area of the wipe without the
   wobble.
 - **Premultiplied alpha is assumed** for both pictures, and the border is opaque.
-- **No Size control**, no presets, no OpenFX version and no browser demo.
+- **No Size control**, no presets and no OpenFX version.
+- **There is a browser demo** at [wipe-demo.stoatworks-labs.com](https://wipe-demo.stoatworks-labs.com).
+  It is a port to a web page, not the plugin: the shaders run in WebGL2 and any CPU
+  half is rewritten in JavaScript. The page lists what it does not reproduce.
 
 ---
 

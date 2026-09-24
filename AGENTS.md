@@ -471,7 +471,8 @@ plugin builds were loading the CPU. Take the ceiling.
 - **The spec's `Size` is not here**, for the reason above.
 - **Area law with modulation on** is the area of the unmodulated waveform;
   the sine's mean over a non-integer number of periods is not accounted for.
-- **No OpenFX port and no browser demo.** Neither is required for 0.1.0.
+- **No OpenFX port.** Not required for 0.1.0. The browser demo came later; see
+  *The browser demo* below.
 
 ---
 

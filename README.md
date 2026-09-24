@@ -255,7 +255,8 @@ includes that allowance, and `tools/verify.sh` runs every suite on the same
 software renderer locally. Nothing has run on a **GPU other than this
 Mac's**. The spec's `Size` control was dropped, for a stated reason.
 Area law with both Multiples high is the one setting whose CPU cost is worth
-knowing about. There are **no presets**, no OpenFX port and no browser demo.
+knowing about. There are **no presets** and no OpenFX port. The
+[browser demo](https://wipe-demo.stoatworks-labs.com) is a port, not the plugin.
 The [user guide](docs/USER-GUIDE.md) covers every control, and the About
 block's fourth button opens it.
 
