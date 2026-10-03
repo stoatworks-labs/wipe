@@ -47,7 +47,8 @@
 #                 plist names the binary on disk and it ad-hoc signs (the
 #                 release job's command), and a host loads it and sees a
 #                 Transition -- and renders one, given a probe that can host
-#                 the Transition context
+#                 the Transition context, and renders in the General context
+#                 without a frame rate, given one with --quirks fusion
 #   bench         the render cost, for the record. Not pass/fail -- there is
 #                 no threshold worth asserting on somebody else's GPU -- but
 #                 a verify run leaves a timing on the record, which is what
@@ -407,6 +408,42 @@ if [ "$(uname)" = "Darwin" ]; then
 					else
 						fail "Transition 0, 0.5 and 1 did not give three different pictures"
 					fi
+
+					# Resolve's Fusion page provides NO frame rate, on the effect
+					# or on any clip (measured in Resolve 21.1), and a getter that
+					# throws out of render fails the whole comp. A probe with
+					# --quirks fusion hosts exactly that. The General context is
+					# the one Fusion uses; the Transition context is where the
+					# probe can feed both inputs, so that is where the picture is
+					# checked: with no rate, Mod Speed must fall back to 24 fps --
+					# the same frame a host reporting 24 gets.
+					case "$usage" in
+						*--quirks*)
+							mod="--set modAmount=0.3 --set modSpeed=0.25"
+							general=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context general \
+							          --quirks fusion --size 320x180 --transition 0.5 --time 5 $mod 2>&1)
+							case "$general" in
+								*"rendered 320x180"*) pass "General context renders with Fusion's missing frame rate (--quirks fusion)" ;;
+								*) fail "the General context fails without a frame rate, as Fusion presents it"; printf '%s\n' "$general" | sed 's/^/       /' | tail -4 ;;
+							esac
+							quirk=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context transition \
+							        --quirks fusion --size 320x180 --transition 0.5 --time 5 $mod 2>&1)
+							at24=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context transition \
+							       --frame-rate 24 --size 320x180 --transition 0.5 --time 5 $mod 2>&1)
+							at25=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context transition \
+							       --frame-rate 25 --size 320x180 --transition 0.5 --time 5 $mod 2>&1)
+							if [ -n "$(hashOf "$quirk")" ] && [ "$(hashOf "$quirk")" = "$(hashOf "$at24")" ] \
+							   && [ "$(hashOf "$quirk")" != "$(hashOf "$at25")" ]; then
+								pass "with no frame rate the modulator runs at 24 fps (= a 24 fps host, != 25)"
+							else
+								fail "with no frame rate the picture is not the 24 fps one"
+								printf '%s\n' "$quirk" | sed 's/^/       /' | tail -4
+							fi
+							;;
+						*)
+							printf '   skipped: %s has no --quirks -- Fusion'"'"'s missing frame rate is unchecked\n' "$OFXPROBE"
+							;;
+					esac
 					;;
 				*)
 					printf '   skipped: %s hosts the Filter context only -- the Transition is described, not rendered\n' "$OFXPROBE"

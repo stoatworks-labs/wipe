@@ -50,7 +50,9 @@
 /// with seconds the frame's time over the clip's frame rate, so any frame
 /// renders on its own and scrubbing shows the wobble where it would be. The
 /// FFGL build's phase runs from the first frame it drew instead -- the only
-/// clock a mixer in a live host has.
+/// clock a mixer in a live host has. Resolve's Fusion page reports no frame
+/// rate at all, so there it assumes 24 fps (see framesPerSecond): a host
+/// property that is missing must never escape a render.
 ///
 /// **The Area law is solved every frame.** The FFGL plugin caches the solve
 /// between frames, which is mutable state across renders; here it is not
@@ -113,8 +115,13 @@ constexpr const char* kPluginDescription =
 	"Not here, by design: Flip-Flop. In Resolume it remembers which end the fader "
 	"last rested at and reverses every other wipe; a transition in a timeline has "
 	"no previous one to remember, so use Reverse. The modulator's travel follows "
-	"the timeline, so every frame renders on its own.\n\n"
+	"the timeline, so every frame renders on its own. Fusion reports no frame "
+	"rate; there, Mod Speed assumes 24 fps.\n\n"
 	"https://stoatworks-labs.com";
+
+/// The frame rate when no host property supplies one: Resolve's default
+/// timeline rate. Resolve's Fusion page reports none -- see framesPerSecond.
+constexpr double kFallbackFps = 24.0;
 
 constexpr const char* kParamTransition     = kOfxImageEffectTransitionParamName;
 constexpr const char* kParamAspectComp     = "aspectComp";
@@ -433,9 +440,20 @@ public:
 private:
 	static OFX::Image* fetchSource( OFX::Clip* clip, double time )
 	{
-		if( clip == nullptr || !clip->isConnected() )
+		if( clip == nullptr )
 			return nullptr;
-		return clip->fetchImage( time );
+		//A host that does not say whether the clip is connected is asked for
+		//the image anyway: an unconnected clip answers with no image, which
+		//is transparent black, the same as saying so.
+		bool connected = true;
+		try
+		{
+			connected = clip->isConnected();
+		}
+		catch( ... )
+		{
+		}
+		return connected ? clip->fetchImage( time ) : nullptr;
 	}
 
 	/// The controls at this frame's time, as the numbers the FFGL build's
@@ -484,25 +502,61 @@ private:
 		return host;
 	}
 
-	/// OFX time is in FRAMES. Seconds come from the frame rate -- the output's,
-	/// or either input's when a host reports none for the output, or 25 if
-	/// nothing does, rather than a division by zero.
-	double secondsAt( double t ) const
+	/// The frame rate: the output clip's, else either input's, else the
+	/// effect's -- the first positive, finite answer -- else kFallbackFps.
+	///
+	/// EVERY read is caught. Resolve's Fusion page (21.1, measured by the lead
+	/// 2026-10-03) provides no frame rate at all, on the effect or on any clip,
+	/// and the Support library turns the missing property into an exception
+	/// that escapes `render` as kOfxStatErrMissingHostFeature: Fusion reports
+	/// the composition "could not be processed" and draws nothing. The Edit
+	/// page does provide one. Only Mod Speed reads the clock, so a missing rate
+	/// costs the modulator its speed in real seconds, never the frame.
+	double framesPerSecond() const
 	{
-		double fps = dstClip->getFrameRate();
-		if( !( fps > 0.0 ) )
-			fps = fromClip->getFrameRate();
-		if( !( fps > 0.0 ) )
-			fps = toClip->getFrameRate();
-		if( !( fps > 0.0 ) )
-			fps = 25.0;
-		return t / fps;
+		const auto positive = []( auto read ) {
+			try
+			{
+				const double fps = read();
+				return std::isfinite( fps ) && fps > 0.0 ? fps : 0.0;
+			}
+			catch( ... )
+			{
+				return 0.0;
+			}
+		};
+		for( const OFX::Clip* clip : { dstClip, fromClip, toClip } )
+		{
+			if( clip == nullptr )
+				continue;
+			const double fps = positive( [ clip ] { return clip->getFrameRate(); } );
+			if( fps > 0.0 )
+				return fps;
+		}
+		const double fps = positive( [ this ] { return getFrameRate(); } );
+		return fps > 0.0 ? fps : kFallbackFps;
 	}
 
+	/// OFX time is in FRAMES; the modulator wants seconds.
+	double secondsAt( double t ) const
+	{
+		return t / framesPerSecond();
+	}
+
+	/// Straight (unpremultiplied) RGBA. A host that does not say is taken to
+	/// be premultiplied, which is what Resolume hands the FFGL build and what
+	/// most OFX hosts deliver.
 	static bool straight( OFX::Clip* clip )
 	{
-		return clip->getPixelComponents() == OFX::ePixelComponentRGBA
-		       && clip->getPreMultiplication() == OFX::eImageUnPreMultiplied;
+		try
+		{
+			return clip->getPixelComponents() == OFX::ePixelComponentRGBA
+			       && clip->getPreMultiplication() == OFX::eImageUnPreMultiplied;
+		}
+		catch( ... )
+		{
+			return false;
+		}
 	}
 
 	Setup setupAt( const OFX::RenderArguments& args, const OFX::Image& dst ) const
