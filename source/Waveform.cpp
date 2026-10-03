@@ -457,7 +457,9 @@ Derived Derive( const Frame& frame )
 	const bool positioned = usesPositioner( frame.pattern );
 	d.centreX = positioned ? std::clamp( frame.centreX, 0.0, 1.0 ) : 0.5;
 	d.centreY = positioned ? std::clamp( frame.centreY, 0.0, 1.0 ) : 0.5;
-	const double pictureAspect = static_cast< double >( frame.outW ) / std::max( 1, frame.outH );
+	//The pixel aspect is 1 everywhere but an anamorphic OpenFX clip, and
+	//multiplying by exactly 1.0 leaves this the FFGL build's number to the bit.
+	const double pictureAspect = static_cast< double >( frame.outW ) * frame.pixelAspect / std::max( 1, frame.outH );
 	d.scaleX = ( frame.aspectComp ? pictureAspect : 1.0 ) * frame.aspect;
 	d.cosR   = std::cos( frame.rotation );
 	d.sinR   = std::sin( frame.rotation );

@@ -2,6 +2,7 @@
 
 #include "Controls.h"
 #include "Diag.h"
+#include "Pass.h"
 #include "Shaders.h"
 
 #include <algorithm>
@@ -40,14 +41,6 @@ std::string glStringOrUnknown( GLenum name )
 	return value ? reinterpret_cast< const char* >( value ) : "unknown";
 }
 
-const char* const kPatternNames[ PAT_COUNT ] = { "Horizontal", "Vertical", "Box", "Diamond", "Circle", "Clock", "Matrix" };
-const char* const kLawNames[ LAW_COUNT ]     = { "Edge", "Area" };
-
-int optionIndex( float value, int count )
-{
-	return std::clamp( static_cast< int >( std::lround( value ) ), 0, count - 1 );
-}
-
 bool sameFrame( const Frame& a, const Frame& b )
 {
 	return std::memcmp( &a, &b, sizeof( Frame ) ) == 0;
@@ -64,36 +57,40 @@ Wipe::Wipe()
 
 	//---------------------------------------------------------------------
 	// Defaults. SetParamInfof reads each one back out of GetFloatParameter,
-	// so these assignments are what the host is told the defaults are.
+	// so these assignments are what the host is told the defaults are. They
+	// come from HostValues (Pass.h), which the OpenFX build's describe reads
+	// too, so the two builds cannot start from different places.
 	//---------------------------------------------------------------------
+	const HostValues defaults;
+
 	//Index 0, which Arena hides: on is the value it must hold for ever.
-	params[ PT_ASPECT_COMP ] = 1.0f;
-	params[ PT_PATTERN ]     = static_cast< float >( PAT_HORIZONTAL );
-	params[ PT_REVERSE ]     = 0.0f;
-	params[ PT_FLIPFLOP ]    = 0.0f;
+	params[ PT_ASPECT_COMP ] = defaults.aspectComp;
+	params[ PT_PATTERN ]     = defaults.pattern;
+	params[ PT_REVERSE ]     = defaults.reverse;
+	params[ PT_FLIPFLOP ]    = 0.0f;//FFGL only: see Pass.h
 
 	//Half way, so a mixer dropped on a layer shows what it does at once. In
 	//Resolume the layer's opacity fader overrides it from the first frame.
-	params[ PT_OPACITY ] = 0.5f;
-	params[ PT_LAW ]      = static_cast< float >( LAW_EDGE );
+	params[ PT_OPACITY ] = defaults.position;
+	params[ PT_LAW ]     = defaults.law;
 
-	params[ PT_SOFTNESS ]     = 0.0f;
-	params[ PT_BORDER_WIDTH ] = 0.0f;
-	params[ PT_BORDER_SOFT ]  = 0.0f;
-	params[ PT_BORDER_R ]     = 1.0f;
-	params[ PT_BORDER_G ]     = 1.0f;
-	params[ PT_BORDER_B ]     = 1.0f;
+	params[ PT_SOFTNESS ]     = defaults.softness;
+	params[ PT_BORDER_WIDTH ] = defaults.borderWidth;
+	params[ PT_BORDER_SOFT ]  = defaults.borderSoftness;
+	params[ PT_BORDER_R ]     = defaults.borderRed;
+	params[ PT_BORDER_G ]     = defaults.borderGreen;
+	params[ PT_BORDER_B ]     = defaults.borderBlue;
 
-	params[ PT_CENTRE_X ] = 0.5f;
-	params[ PT_CENTRE_Y ] = 0.5f;
-	params[ PT_ROTATION ] = 0.0f;
-	params[ PT_ASPECT ]   = 0.5f;//unity
+	params[ PT_CENTRE_X ] = defaults.centreX;
+	params[ PT_CENTRE_Y ] = defaults.centreY;
+	params[ PT_ROTATION ] = defaults.rotation;
+	params[ PT_ASPECT ]   = defaults.aspect;
 
-	params[ PT_MOD_AMOUNT ] = 0.0f;
-	params[ PT_MOD_FREQ ]   = 0.4f;//about 2.6 cycles across the picture
-	params[ PT_MOD_SPEED ]  = 0.25f;//1 Hz
-	params[ PT_MULT_H ]     = 1.0f;
-	params[ PT_MULT_V ]     = 1.0f;
+	params[ PT_MOD_AMOUNT ] = defaults.modAmount;
+	params[ PT_MOD_FREQ ]   = defaults.modFrequency;
+	params[ PT_MOD_SPEED ]  = defaults.modSpeed;
+	params[ PT_MULT_H ]     = defaults.multipleH;
+	params[ PT_MULT_V ]     = defaults.multipleV;
 
 	//---------------------------------------------------------------------
 	// Declaration. Every ranged parameter is a plain 0..1 float, with the
@@ -233,8 +230,11 @@ FFResult Wipe::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	//-----------------------------------------------------------------
 	// The fader, and the flip-flop. A transition is an arrival at one end
 	// from the other; each one flips the direction while Flip-Flop is on.
+	// This is the one piece of state across frames, and it is why the
+	// OpenFX build has no Flip-Flop: see Pass.h.
 	//-----------------------------------------------------------------
-	const double position = std::clamp( static_cast< double >( params[ PT_OPACITY ] ), 0.0, 1.0 );
+	const HostValues host = hostValues();
+	const double position = std::clamp( static_cast< double >( host.position ), 0.0, 1.0 );
 	const bool flipflop   = params[ PT_FLIPFLOP ] > 0.5f;
 	if( position >= 1.0 )
 	{
@@ -260,66 +260,48 @@ FFResult Wipe::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 		flipped = false;
 
 	//-----------------------------------------------------------------
-	// The generator's frame, in physical units.
+	// The generator's frame, the comparators and the modulator, in
+	// physical units -- Pass.cpp, the same code the OpenFX build calls.
 	//-----------------------------------------------------------------
-	Frame frame;
-	frame.pattern    = optionIndex( params[ PT_PATTERN ], PAT_COUNT );
-	frame.reverse    = ( params[ PT_REVERSE ] > 0.5f ) != flipped;
-	frame.aspectComp = params[ PT_ASPECT_COMP ] > 0.5f;
-	frame.centreX    = std::clamp( params[ PT_CENTRE_X ], 0.0f, 1.0f );
-	frame.centreY    = std::clamp( params[ PT_CENTRE_Y ], 0.0f, 1.0f );
-	frame.rotation   = RotationRadiansFromParam( params[ PT_ROTATION ] );
-	frame.aspect     = AspectFromParam( params[ PT_ASPECT ] );
-	frame.multipleH  = MultipleFromParam( params[ PT_MULT_H ] );
-	frame.multipleV  = MultipleFromParam( params[ PT_MULT_V ] );
-	frame.softnessPx = SoftnessPxFromParam( params[ PT_SOFTNESS ] );
-	frame.outW       = static_cast< int >( currentViewport.width );
-	frame.outH       = static_cast< int >( currentViewport.height );
-	if( frame.outW <= 0 || frame.outH <= 0 )
+	const int outW = static_cast< int >( currentViewport.width );
+	const int outH = static_cast< int >( currentViewport.height );
+	if( outW <= 0 || outH <= 0 )
 		return FF_FAIL;
 
-	const Derived derived = Derive( frame );
-
-	//Pixels on the horizontal ramp become W units through the pattern's
-	//reference slope; every other pattern's edge follows its own slope from
-	//there.
-	const double softW       = frame.softnessPx * derived.unitsPerPixel;
-	const double borderW     = BorderWidthPxFromParam( params[ PT_BORDER_WIDTH ] ) * derived.unitsPerPixel;
-	const double borderSoftW = BorderSoftnessPxFromParam( params[ PT_BORDER_SOFT ] ) * derived.unitsPerPixel;
-	const double modW        = ModAmountPxFromParam( params[ PT_MOD_AMOUNT ] ) * derived.unitsPerPixel;
-	const double modFreq     = ModFrequencyFromParam( params[ PT_MOD_FREQ ] );
-	const double modPhase    = timing::ModPhase( elapsed, ModSpeedHzFromParam( params[ PT_MOD_SPEED ] ) );
+	Pass pass = BeginPass( host, flipped, outW, outH, elapsed );
+	const Frame& frame     = pass.frame;
+	const Derived& derived = pass.derived;
 
 	//-----------------------------------------------------------------
 	// The level. Edge law is the hardware's: linear in the fader. Area law
 	// solves for the level whose (soft) B area is the fader, and is cached
-	// because the solve is real CPU work.
+	// here because the solve is real CPU work -- a cache the OpenFX build
+	// may not keep, so it calls LevelFor every frame instead.
 	//-----------------------------------------------------------------
-	double level;
-	if( optionIndex( params[ PT_LAW ], LAW_COUNT ) == LAW_AREA )
+	if( pass.law == LAW_AREA )
 	{
-		if( !areaCache.valid || !sameFrame( areaCache.frame, frame ) || areaCache.position != position
-		    || areaCache.softW != softW )
+		if( !areaCache.valid || !sameFrame( areaCache.frame, frame ) || areaCache.position != pass.position
+		    || areaCache.softW != pass.softW )
 		{
-			areaCache.level    = AreaLevel( frame, derived, position, softW );
+			areaCache.level    = LevelFor( pass );
 			areaCache.frame    = frame;
-			areaCache.position = position;
-			areaCache.softW    = softW;
+			areaCache.position = pass.position;
+			areaCache.softW    = pass.softW;
 			areaCache.valid    = true;
 		}
-		level = areaCache.level;
+		pass.level = areaCache.level;
 	}
 	else
-		level = EdgeLevel( derived, position );
+		pass.level = LevelFor( pass );
 
 	lastState.frame            = frame;
 	lastState.derived          = derived;
-	lastState.level            = level;
-	lastState.softW            = softW;
-	lastState.borderW          = borderW;
-	lastState.borderSoftW      = borderSoftW;
-	lastState.modW             = modW;
-	lastState.modPhase         = modPhase;
+	lastState.level            = pass.level;
+	lastState.softW            = pass.softW;
+	lastState.borderW          = pass.borderW;
+	lastState.borderSoftW      = pass.borderSoftW;
+	lastState.modW             = pass.modW;
+	lastState.modPhase         = pass.modPhase;
 	lastState.effectiveReverse = frame.reverse;
 	lastState.flipped          = flipped;
 	lastState.transitions      = transitions;
@@ -348,27 +330,30 @@ FFResult Wipe::ProcessOpenGL( ProcessOpenGLStruct* pGL )
 	shader.Set( "HalfTexelA", 0.5f / static_cast< float >( a.Width ), 0.5f / static_cast< float >( a.Height ) );
 	shader.Set( "HalfTexelB", 0.5f / static_cast< float >( b.Width ), 0.5f / static_cast< float >( b.Height ) );
 
-	shader.Set( "Position", static_cast< float >( position ) );
+	//Everything else, as the floats UniformsFor makes of the pass -- the
+	//same floats the OpenFX build's C++ copy of this shader starts from.
+	const Uniforms u = UniformsFor( pass );
+	shader.Set( "Position", u.position );
 
-	shader.Set( "Pattern", static_cast< float >( frame.pattern ) );
-	shader.Set( "Reverse", frame.reverse ? 1.0f : 0.0f );
-	shader.Set( "Centre", static_cast< float >( derived.centreX ), static_cast< float >( derived.centreY ) );
-	shader.Set( "ScaleX", static_cast< float >( derived.scaleX ) );
-	shader.Set( "RotCS", static_cast< float >( derived.cosR ), static_cast< float >( derived.sinR ) );
-	shader.Set( "Norm", static_cast< float >( derived.norm ) );
-	shader.Set( "Multiple", static_cast< float >( frame.multipleH ), static_cast< float >( frame.multipleV ) );
-	shader.Set( "WRange", static_cast< float >( derived.wMin ), static_cast< float >( derived.wMax ) );
-	shader.Set( "MatrixCells", static_cast< float >( derived.matrixCols ), static_cast< float >( derived.matrixRows ) );
+	shader.Set( "Pattern", u.pattern );
+	shader.Set( "Reverse", u.reverse );
+	shader.Set( "Centre", u.centre[ 0 ], u.centre[ 1 ] );
+	shader.Set( "ScaleX", u.scaleX );
+	shader.Set( "RotCS", u.rotCS[ 0 ], u.rotCS[ 1 ] );
+	shader.Set( "Norm", u.norm );
+	shader.Set( "Multiple", u.multiple[ 0 ], u.multiple[ 1 ] );
+	shader.Set( "WRange", u.wRange[ 0 ], u.wRange[ 1 ] );
+	shader.Set( "MatrixCells", u.matrixCells[ 0 ], u.matrixCells[ 1 ] );
 
-	shader.Set( "Level", static_cast< float >( level ) );
-	shader.Set( "SoftW", static_cast< float >( softW ) );
-	shader.Set( "BorderW", static_cast< float >( borderW ) );
-	shader.Set( "BorderSoftW", static_cast< float >( borderSoftW ) );
-	shader.Set( "BorderColour", params[ PT_BORDER_R ], params[ PT_BORDER_G ], params[ PT_BORDER_B ] );
+	shader.Set( "Level", u.level );
+	shader.Set( "SoftW", u.softW );
+	shader.Set( "BorderW", u.borderW );
+	shader.Set( "BorderSoftW", u.borderSoftW );
+	shader.Set( "BorderColour", u.borderColour[ 0 ], u.borderColour[ 1 ], u.borderColour[ 2 ] );
 
-	shader.Set( "ModW", static_cast< float >( modW ) );
-	shader.Set( "ModFreq", static_cast< float >( modFreq ) );
-	shader.Set( "ModPhase", static_cast< float >( modPhase ) );
+	shader.Set( "ModW", u.modW );
+	shader.Set( "ModFreq", u.modFreq );
+	shader.Set( "ModPhase", u.modPhase );
 
 	quad.Draw();
 
@@ -403,6 +388,32 @@ float Wipe::GetFloatParameter( unsigned int index )
 		return 0.0f;
 
 	return params[ index ];
+}
+
+HostValues Wipe::hostValues() const
+{
+	HostValues host;
+	host.aspectComp     = params[ PT_ASPECT_COMP ];
+	host.pattern        = params[ PT_PATTERN ];
+	host.reverse        = params[ PT_REVERSE ];
+	host.position       = params[ PT_OPACITY ];
+	host.law            = params[ PT_LAW ];
+	host.softness       = params[ PT_SOFTNESS ];
+	host.borderWidth    = params[ PT_BORDER_WIDTH ];
+	host.borderSoftness = params[ PT_BORDER_SOFT ];
+	host.borderRed      = params[ PT_BORDER_R ];
+	host.borderGreen    = params[ PT_BORDER_G ];
+	host.borderBlue     = params[ PT_BORDER_B ];
+	host.centreX        = params[ PT_CENTRE_X ];
+	host.centreY        = params[ PT_CENTRE_Y ];
+	host.rotation       = params[ PT_ROTATION ];
+	host.aspect         = params[ PT_ASPECT ];
+	host.modAmount      = params[ PT_MOD_AMOUNT ];
+	host.modFrequency   = params[ PT_MOD_FREQ ];
+	host.modSpeed       = params[ PT_MOD_SPEED ];
+	host.multipleH      = params[ PT_MULT_H ];
+	host.multipleV      = params[ PT_MULT_V ];
+	return host;
 }
 
 //---------------------------------------------------------------------------

@@ -26,6 +26,13 @@ void main()
 
 //---------------------------------------------------------------------------
 // The pattern generator, the comparators, and the mix.
+//
+//= mirrored -- `Shade` in Pass.cpp is this shader's main(), waveform(),
+// cper(), matrixRank() and compare() written again in C++, for the OpenFX
+// build's CPU render. EDIT BOTH. `wptest --cpu` renders the two side by side
+// and fails when they disagree. (The marker is out here rather than in the
+// GLSL because demo/plugin.js carries this string too, character for
+// character.)
 //---------------------------------------------------------------------------
 const char* const kWipeShader = R"(#version 410 core
 

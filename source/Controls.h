@@ -50,6 +50,12 @@ enum Law : int
 	LAW_COUNT = 2
 };
 
+/// The option labels, in declaration order. Both builds read these, so a
+/// Pattern index means the same wipe in Resolume and in an OpenFX host.
+inline constexpr const char* kPatternNames[ PAT_COUNT ] = { "Horizontal", "Vertical", "Box", "Diamond",
+	                                                        "Circle",     "Clock",    "Matrix" };
+inline constexpr const char* kLawNames[ LAW_COUNT ]     = { "Edge", "Area" };
+
 /// The most copies of the waveform Multiple H / Multiple V will run.
 inline constexpr int kMultipleMax = 8;
 

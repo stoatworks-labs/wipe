@@ -80,6 +80,13 @@ struct Frame
 	double softnessPx = 0.0;///< on the horizontal ramp; see Controls.h
 	int outW         = 1280;
 	int outH         = 720;
+	/// The output's pixel aspect ratio, which Aspect Comp folds into the
+	/// picture's aspect so a circle stays round on an anamorphic raster. The
+	/// FFGL build never sets it -- Resolume's pixels are square -- and at 1
+	/// Derive is bit-for-bit what it was before the field existed, which is
+	/// why the browser demo's port of Derive does not carry it. Only the
+	/// OpenFX build, whose hosts do have anamorphic formats, passes the clip's.
+	double pixelAspect = 1.0;
 };
 
 /// Everything the shader is handed about the frame, derived from a Frame.

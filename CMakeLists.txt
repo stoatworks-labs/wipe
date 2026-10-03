@@ -41,6 +41,38 @@ endif()
 
 option(WIPE_BUILD_TOOLS "Build the offline render and measurement harness" ON)
 
+# The FFGL plugin, the FFGL SDK submodule and GLEW are one dependency group, and
+# the OpenFX plugin belongs to none of it. Turning this OFF builds the OFX plugin
+# alone, with no GL loader anywhere in the configure -- which is what the Linux
+# job does, because the FFGL SDK has no Linux path and GLEW would otherwise have
+# to be installed to build something that never calls it.
+option(WIPE_BUILD_FFGL "Build the FFGL plugin (needs the FFGL SDK and, off macOS, GLEW)" ON)
+
+# ---------------------------------------------------------------------------
+# The parts with no GL in them at all: the parameter conversions, the
+# generator's frame and the closed-form areas, the clock, and the pass -- the
+# CPU half of a frame plus `Shade`, the wipe shader mirrored in C++.
+#
+# A separate library from the FFGL core because every build needs it and only
+# one of them has a GL context: the OFX plugin renders on the CPU and the Linux
+# job has no GL loader configured. Splitting it is what lets the OFX build link
+# the SAME arithmetic rather than a second transcription of it.
+# ---------------------------------------------------------------------------
+add_library(wipe_dsp OBJECT
+    source/Controls.h
+    source/Controls.cpp
+    source/Timing.h
+    source/Timing.cpp
+    source/Waveform.h
+    source/Waveform.cpp
+    source/Pass.h
+    source/Pass.cpp
+)
+target_include_directories(wipe_dsp PUBLIC source)
+set_target_properties(wipe_dsp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+if(WIPE_BUILD_FFGL)
+
 # ---------------------------------------------------------------------------
 # The Resolume FFGL SDK, as a git submodule pinned to b1afaf9 -- the rev the
 # rest of the fleet pins.
@@ -69,12 +101,6 @@ add_library(wipe_core OBJECT
     source/StoatworksAboutParams.h
     source/Diag.h
     source/Diag.cpp
-    source/Controls.h
-    source/Controls.cpp
-    source/Timing.h
-    source/Timing.cpp
-    source/Waveform.h
-    source/Waveform.cpp
     source/Shaders.h
     source/Shaders.cpp
     source/Wipe.h
@@ -82,7 +108,7 @@ add_library(wipe_core OBJECT
 )
 
 target_include_directories(wipe_core PUBLIC source)
-target_link_libraries(wipe_core PUBLIC ffgl::sdk)
+target_link_libraries(wipe_core PUBLIC ffgl::sdk wipe_dsp)
 target_compile_definitions(wipe_core PUBLIC WIPE_VERSION="${PROJECT_VERSION}")
 set_target_properties(wipe_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -100,7 +126,12 @@ endif()
 # ---------------------------------------------------------------------------
 function(wipe_add_plugin target entry bundle_name identifier)
     add_library(${target} MODULE ${entry})
-    target_link_libraries(${target} PRIVATE wipe_core)
+    # wipe_dsp is named again here, and on every other final target, because
+    # an OBJECT library's objects do NOT travel transitively through a second
+    # OBJECT library. wipe_core linking it gives this target the include paths
+    # and nothing to link, and the failure is a pile of undefined symbols at
+    # the very last step of an otherwise clean build.
+    target_link_libraries(${target} PRIVATE wipe_core wipe_dsp)
 
     if(APPLE)
         set_target_properties(${target} PROPERTIES
@@ -157,7 +188,7 @@ if(WIPE_BUILD_TOOLS AND APPLE)
     add_executable(wptest tools/wptest/main.cpp)
     # zlib ships with the OS, which is why the PNG writer is fifty lines
     # rather than a vendored dependency.
-    target_link_libraries(wptest PRIVATE wipe_core z
+    target_link_libraries(wptest PRIVATE wipe_core wipe_dsp z
         "-framework OpenGL"
         "-framework AppKit"
     )
@@ -171,4 +202,86 @@ if(WIPE_BUILD_TOOLS AND APPLE)
     add_test(NAME border     COMMAND wptest --border)
     add_test(NAME modulation COMMAND wptest --modulation)
     add_test(NAME flipflop   COMMAND wptest --flipflop)
+    add_test(NAME cpu        COMMAND wptest --cpu)
+endif()
+
+endif()  # WIPE_BUILD_FFGL
+
+# ---------------------------------------------------------------------------
+# The OpenFX build, for Resolve/Nuke/Natron/Vegas, as a TRANSITION: the two
+# inputs are the transition's SourceFrom (A) and SourceTo (B), and the fader is
+# the host's Transition parameter. CPU render against the vendored OFX SDK
+# subset under external/openfx (C headers + the official C++ Support library,
+# BSD-3). wipe_dsp links straight in, so the generator's frame, both fader laws
+# and the parameter conversions are the same code as the FFGL build; only the
+# per-pixel shader is written twice (Pass.cpp's `Shade`, held to the GPU by
+# `wptest --cpu`).
+# ---------------------------------------------------------------------------
+option(BUILD_OFX "Build the OpenFX plugin" ON)
+
+if(BUILD_OFX)
+    set(OFX_SDK "${CMAKE_CURRENT_SOURCE_DIR}/external/openfx")
+
+    add_library(WipeOFX MODULE
+        source/ofx/WipeOFX.cpp
+        ${OFX_SDK}/Support/Library/ofxsCore.cpp
+        ${OFX_SDK}/Support/Library/ofxsImageEffect.cpp
+        ${OFX_SDK}/Support/Library/ofxsInteract.cpp
+        ${OFX_SDK}/Support/Library/ofxsLog.cpp
+        ${OFX_SDK}/Support/Library/ofxsMultiThread.cpp
+        ${OFX_SDK}/Support/Library/ofxsParams.cpp
+        ${OFX_SDK}/Support/Library/ofxsProperty.cpp
+        ${OFX_SDK}/Support/Library/ofxsPropertyValidation.cpp
+    )
+    # PRIVATE on an OBJECT library gives both the objects and the usage
+    # requirements. `$<TARGET_OBJECTS:wipe_dsp>` would give the objects alone
+    # -- no include directories, no compile definitions -- and the failure is
+    # platform-specific enough to cost a day.
+    target_link_libraries(WipeOFX PRIVATE wipe_dsp)
+    target_include_directories(WipeOFX PRIVATE
+        source
+        "${OFX_SDK}/include"
+        "${OFX_SDK}/Support/include"
+    )
+    target_compile_definitions(WipeOFX PRIVATE
+        WIPE_VERSION="${PROJECT_VERSION}"
+        PLUGIN_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        PLUGIN_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    )
+
+    # Threads, explicitly. The OFX Support library's multi-thread suite calls
+    # pthread_create, and on Rocky 8 -- glibc 2.28, the floor Resolve supports --
+    # that still lives in libpthread; libpthread was only folded into libc in
+    # glibc 2.34. Leave it out and the plugin compiles, links, passes a symbol
+    # check and a glibc-version check, and then fails at dlopen with "undefined
+    # symbol: pthread_create". macOS and Windows never show it.
+    find_package(Threads REQUIRED)
+    target_link_libraries(WipeOFX PRIVATE Threads::Threads)
+
+    set(OFX_BUNDLE_DIR "${CMAKE_BINARY_DIR}/Wipe.ofx.bundle")
+    set_target_properties(WipeOFX PROPERTIES
+        PREFIX ""
+        SUFFIX ".ofx"
+        OUTPUT_NAME "Wipe"
+        LIBRARY_OUTPUT_DIRECTORY "${OFX_BUNDLE_DIR}/Contents/MacOS"
+    )
+    if(APPLE)
+        set(OFX_BUNDLE_IDENTIFIER "com.stoatworks.wipe.ofx")
+        configure_file(cmake/InfoOFX.plist.in
+            "${OFX_BUNDLE_DIR}/Contents/Info.plist" @ONLY)
+    elseif(WIN32)
+        set_target_properties(WipeOFX PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY "${OFX_BUNDLE_DIR}/Contents/Win64"
+            RUNTIME_OUTPUT_DIRECTORY "${OFX_BUNDLE_DIR}/Contents/Win64"
+            LIBRARY_OUTPUT_DIRECTORY_RELEASE "${OFX_BUNDLE_DIR}/Contents/Win64"
+            RUNTIME_OUTPUT_DIRECTORY_RELEASE "${OFX_BUNDLE_DIR}/Contents/Win64"
+            # MSVC's .exp/.lib for this target; its default directory collides
+            # with the FFGL target's, which shares the output base name, and a
+            # parallel build then races on the file (LNK1104).
+            ARCHIVE_OUTPUT_DIRECTORY "${OFX_BUNDLE_DIR}/importlib"
+            ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${OFX_BUNDLE_DIR}/importlib")
+    else()
+        set_target_properties(WipeOFX PROPERTIES
+            LIBRARY_OUTPUT_DIRECTORY "${OFX_BUNDLE_DIR}/Contents/Linux-x86-64")
+    endif()
 endif()

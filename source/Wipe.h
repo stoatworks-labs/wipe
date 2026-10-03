@@ -6,6 +6,7 @@
 //itself, so an include placed above it fails with "unknown type name" errors
 //that point at the About block rather than at the include order.
 #include "StoatworksAboutParams.h"
+#include "Pass.h"
 #include "Timing.h"
 #include "Waveform.h"
 
@@ -143,6 +144,9 @@ public:
 	};
 
 private:
+	/// The parameters as Pass.h's HostValues: what BeginPass reads.
+	wipe::HostValues hostValues() const;
+
 	ffglex::FFGLShader shader;
 	ffglex::FFGLScreenQuad quad;
 

@@ -19,6 +19,8 @@
         wptest --border                 so does the border's
         wptest --modulation             the edge wobble is the stated sine
         wptest --flipflop               alternate transitions reverse
+        wptest --cpu                    the OpenFX build's C++ shader IS the GLSL one
+        wptest --cpu-bench              the OpenFX build's CPU render at 1080p, threaded
         wptest --bench                  ms/frame at 720p through 4K
         wptest --pipe                   raw frames in, raw frames out (two inputs)
 
@@ -57,6 +59,7 @@
 */
 
 #include "Controls.h"
+#include "Pass.h"
 #include "Shaders.h"
 #include "Timing.h"
 #include "Waveform.h"
@@ -77,7 +80,9 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <unistd.h>
+#include <utility>
 #include <vector>
 
 using namespace wipe;
@@ -1658,6 +1663,505 @@ int runFlipFlop()
 }
 
 //---------------------------------------------------------------------------
+// --cpu: the OpenFX build's copy of the shader, against the shader.
+//
+// The OpenFX build renders on the CPU through `wipe::Shade` (Pass.cpp), the
+// wipe shader's main written again in C++, from the uniforms `BeginPass`,
+// `LevelFor` and `UniformsFor` make of the controls -- the path WipeOFX.cpp
+// takes, minus only its pixel-format marshalling. This renders the real FFGL
+// plugin on the GPU into a FLOAT framebuffer and that path on the CPU from
+// the same two cards, the same controls and the same clock, and compares
+// every pixel, at several fader positions on eight settings that between them
+// exercise every pattern, both laws, the soft edge, the border, the
+// positioner, rotation, aspect, Aspect Comp, Reverse, both Multiples and the
+// modulator.
+//
+// What is allowed, and why -- derived, not fitted:
+//
+//   * A pixel inside a region agrees to `kCpuTol` = 1/1024, a quarter of an
+//     8-bit code. The two run the same float32 formulae, but the GPU fuses
+//     multiply-adds where it likes and the GLSL spec leaves sin and atan's
+//     precision to the implementation, so w may differ by a few ULPs; through
+//     the softest comparator in these cases (3.2 px of a Diamond) a few ULPs
+//     of w is ~3e-4 of key, a third of the tolerance.
+//
+//   * A pixel ON an edge is allowed whatever the CPU gives within the GL
+//     spec's own precision of the interpolated `uv`: each axis may be off by
+//     1e-5 (OpenGL 4.1 core section 2.1.1, "about 1 part in 10^5" -- the same
+//     allowance `--area` derives, and Apple's software renderer, which a
+//     GPU-less CI runner gets, really is off by up to 9e-6). So the CPU is
+//     evaluated at the four corners of that box around the pixel centre, and
+//     the GPU must lie within their range (plus kCpuTol). A hard comparator
+//     right at the level can go either way inside that box; nothing else can.
+//
+//     The same uv moves the shader's two bilinear fetches, so the box reads
+//     the cards bilinearly at its corners too: off a texel centre by 9e-6 a
+//     fetch blends in a quarter of a percent of the next texel, which at a
+//     card's own hard edge (a stripe, the disc) is ~2/1000 -- seen on the
+//     software renderer, never on this Mac's GPU.
+//
+//   * With the modulator on, `w` may also be off by sin's error times Mod
+//     Amount. Desktop GLSL leaves sin's precision undefined, and the only
+//     bound the GL family publishes -- GLSL ES 3.0's for highp, 2^-11
+//     absolute -- covers [-pi, pi] alone, where the modulator's argument runs
+//     to 2 pi x 32. So it is not assumed: `rendererSin` MEASURES this
+//     renderer's sin over exactly the arguments the modulator hands it (its
+//     own `along`, its own float arithmetic, a one-pass float render), and the
+//     box moves the level by +/- ModW times that (never less than 2^-11) --
+//     which, through two comparators that read only `level - w`, is the same
+//     as moving w. On this Mac's GPU sin is good to ~1e-7 and no pixel uses
+//     it. Apple's software renderer, which CI gets, measures 1.1e-3 off
+//     (2026-10-03), and there the FFGL plugin itself puts 12 to 16 pixels of
+//     a modulated hard edge on the other side from where the GPU puts them.
+//
+//   * The box is 1e-5 of the picture -- 0.0064 px at 640 wide -- so it cannot
+//     excuse a misplaced edge: the negative control moves the CPU's level by
+//     ONE pixel on a hard Horizontal wipe and requires that exactly one column
+//     of pixels fails, and a second renders the CPU on the wrong pattern.
+//
+// Reported per setting, over every position and both rasters: the worst
+// channel error in 8-bit codes (/255) and how many pixels' 8-bit values
+// differ, which is what an 8-bit OpenFX render would show against an 8-bit
+// FFGL one; the worst float error off the edges; and how many edge pixels
+// needed the uv allowance.
+//---------------------------------------------------------------------------
+constexpr double kCpuTol  = 1.0 / 1024.0;
+constexpr float kUvSlack  = 1e-5f;
+constexpr double kSinBound = 1.0 / 2048.0;
+
+struct CpuCase
+{
+	const char* label;
+	std::vector< std::pair< const char*, float > > settings;
+};
+
+/// The controls exactly as the plugin holds them, as the OpenFX build hands
+/// them to BeginPass.
+HostValues hostValuesOf( Wipe& plugin )
+{
+	HostValues h;
+	h.aspectComp     = plugin.GetFloatParameter( Wipe::PT_ASPECT_COMP );
+	h.pattern        = plugin.GetFloatParameter( Wipe::PT_PATTERN );
+	h.reverse        = plugin.GetFloatParameter( Wipe::PT_REVERSE );
+	h.position       = plugin.GetFloatParameter( Wipe::PT_OPACITY );
+	h.law            = plugin.GetFloatParameter( Wipe::PT_LAW );
+	h.softness       = plugin.GetFloatParameter( Wipe::PT_SOFTNESS );
+	h.borderWidth    = plugin.GetFloatParameter( Wipe::PT_BORDER_WIDTH );
+	h.borderSoftness = plugin.GetFloatParameter( Wipe::PT_BORDER_SOFT );
+	h.borderRed      = plugin.GetFloatParameter( Wipe::PT_BORDER_R );
+	h.borderGreen    = plugin.GetFloatParameter( Wipe::PT_BORDER_G );
+	h.borderBlue     = plugin.GetFloatParameter( Wipe::PT_BORDER_B );
+	h.centreX        = plugin.GetFloatParameter( Wipe::PT_CENTRE_X );
+	h.centreY        = plugin.GetFloatParameter( Wipe::PT_CENTRE_Y );
+	h.rotation       = plugin.GetFloatParameter( Wipe::PT_ROTATION );
+	h.aspect         = plugin.GetFloatParameter( Wipe::PT_ASPECT );
+	h.modAmount      = plugin.GetFloatParameter( Wipe::PT_MOD_AMOUNT );
+	h.modFrequency   = plugin.GetFloatParameter( Wipe::PT_MOD_FREQ );
+	h.modSpeed       = plugin.GetFloatParameter( Wipe::PT_MOD_SPEED );
+	h.multipleH      = plugin.GetFloatParameter( Wipe::PT_MULT_H );
+	h.multipleV      = plugin.GetFloatParameter( Wipe::PT_MULT_V );
+	return h;
+}
+
+struct CpuTally
+{
+	long pixels      = 0;
+	long byteDiffers = 0;///< pixels whose 8-bit value differs in any channel
+	int worstCode    = 0;///< the largest 8-bit difference, in codes
+	double worstFloat = 0.0;///< the largest float difference among agreeing pixels
+	long onEdge      = 0;///< pixels that needed the uv allowance
+	long failed      = 0;
+
+	void Add( const CpuTally& o )
+	{
+		pixels += o.pixels;
+		byteDiffers += o.byteDiffers;
+		worstCode  = std::max( worstCode, o.worstCode );
+		worstFloat = std::max( worstFloat, o.worstFloat );
+		onEdge += o.onEdge;
+		failed += o.failed;
+	}
+};
+
+int code8( float v )
+{
+	return static_cast< int >( std::lround( std::min( 1.0f, std::max( 0.0f, v ) ) * 255.0f ) );
+}
+
+/// How far this renderer's sin is off, over the arguments the modulator hands
+/// it in a render of `un` at the rig's raster: the modulator's own expression,
+/// rendered alone to the rig's float framebuffer with `along` beside it, and
+/// compared with a double-precision sin of the same float argument. The
+/// framebuffer is overwritten, so read the picture first.
+double rendererSin( Rig& rig, const Uniforms& un )
+{
+	static const char* const kProbe = R"(#version 410 core
+in vec2 uv;
+out vec4 fragColor;
+uniform float Pattern;
+uniform float ModFreq;
+uniform float ModPhase;
+const float kTwoPi = 6.283185307179586;
+void main()
+{
+	float along = ( Pattern > 0.5 && Pattern < 1.5 ) ? uv.x : uv.y;
+	fragColor = vec4( sin( kTwoPi * ( ModFreq * along - ModPhase ) ), along, 0.0, 1.0 );
+}
+)";
+	ffglex::FFGLShader probe;
+	ffglex::FFGLScreenQuad quad;
+	if( !probe.Compile( kVertexShader, kProbe ) || !quad.Initialise() )
+		return -1.0;
+	glBindFramebuffer( GL_FRAMEBUFFER, rig.outputFBO );
+	glViewport( 0, 0, rig.width, rig.height );
+	{
+		ffglex::ScopedShaderBinding binding( probe.GetGLID() );
+		probe.Set( "Pattern", un.pattern );
+		probe.Set( "ModFreq", un.modFreq );
+		probe.Set( "ModPhase", un.modPhase );
+		quad.Draw();
+	}
+	const ImageF out = rig.PixelsF();
+	quad.Release();
+	probe.FreeGLResources();
+
+	constexpr float kTwoPi = 6.283185307179586f;
+	double worst = 0.0;
+	for( size_t at = 0; at < out.size(); at += 4 )
+	{
+		const float arg = kTwoPi * ( un.modFreq * out[ at + 1 ] - un.modPhase );
+		worst           = std::max( worst, std::fabs( static_cast< double >( out[ at ] ) - std::sin( static_cast< double >( arg ) ) ) );
+	}
+	return worst;
+}
+
+/// A card read the way the shader's fetchA/fetchB read it at a picture
+/// coordinate: clamped half a texel inside, then GL_LINEAR with clamp to edge.
+/// At a pixel's own centre that is the texel itself; a hair off it, a blend.
+void bilinear( const Image& card, int W, int H, float u, float v, float out[ 4 ] )
+{
+	const float hx = 0.5f / static_cast< float >( W ), hy = 0.5f / static_cast< float >( H );
+	const float tx = std::min( std::max( u, hx ), 1.0f - hx ) * static_cast< float >( W ) - 0.5f;
+	const float ty = std::min( std::max( v, hy ), 1.0f - hy ) * static_cast< float >( H ) - 0.5f;
+	const int x0 = static_cast< int >( std::floor( tx ) ), y0 = static_cast< int >( std::floor( ty ) );
+	const float fx = tx - static_cast< float >( x0 ), fy = ty - static_cast< float >( y0 );
+	for( int c = 0; c < 4; ++c )
+	{
+		float sum = 0.0f;
+		for( int j = 0; j < 2; ++j )
+			for( int i = 0; i < 2; ++i )
+			{
+				const int sx = std::min( std::max( x0 + i, 0 ), W - 1 );
+				const int sy = std::min( std::max( y0 + j, 0 ), H - 1 );
+				const float weight = ( i ? fx : 1.0f - fx ) * ( j ? fy : 1.0f - fy );
+				sum += weight * static_cast< float >( card[ ( static_cast< size_t >( sy ) * W + sx ) * 4 + c ] ) / 255.0f;
+			}
+		out[ c ] = sum;
+	}
+}
+
+/// Every pixel of a GPU float render against Shade over the same two cards.
+CpuTally compareCpu( const ImageF& gpu, const Image& aCard, const Image& bCard, int W, int H, const Uniforms& un,
+                     float wSlack = 0.0f )
+{
+	CpuTally t;
+	for( int y = 0; y < H; ++y )
+		for( int x = 0; x < W; ++x )
+		{
+			const size_t at = ( static_cast< size_t >( y ) * W + x ) * 4;
+			float a[ 4 ], b[ 4 ], cpu[ 4 ];
+			for( int c = 0; c < 4; ++c )
+			{
+				a[ c ] = static_cast< float >( aCard[ at + c ] ) / 255.0f;
+				b[ c ] = static_cast< float >( bCard[ at + c ] ) / 255.0f;
+			}
+			const float u = ( static_cast< float >( x ) + 0.5f ) / static_cast< float >( W );
+			const float v = ( static_cast< float >( y ) + 0.5f ) / static_cast< float >( H );
+			Shade( un, u, v, a, b, cpu );
+
+			++t.pixels;
+			double worst = 0.0;
+			bool byteDiffer = false;
+			for( int c = 0; c < 4; ++c )
+			{
+				worst           = std::max( worst, std::fabs( static_cast< double >( gpu[ at + c ] ) - cpu[ c ] ) );
+				const int codes = std::abs( code8( gpu[ at + c ] ) - code8( cpu[ c ] ) );
+				t.worstCode     = std::max( t.worstCode, codes );
+				byteDiffer      = byteDiffer || codes != 0;
+			}
+			if( byteDiffer )
+				++t.byteDiffers;
+
+			if( worst <= kCpuTol )
+			{
+				t.worstFloat = std::max( t.worstFloat, worst );
+				continue;
+			}
+
+			//On an edge -- of the wipe, or of either card? The CPU's range
+			//over the GL spec's uv allowance, applied to everything the shader
+			//does with uv: the waveform, and both bilinear fetches. And, with
+			//the modulator on, over sin's: moving the level by the modulator's
+			//allowance moves both comparators exactly as an error in w would.
+			float lo[ 4 ] = { cpu[ 0 ], cpu[ 1 ], cpu[ 2 ], cpu[ 3 ] };
+			float hi[ 4 ] = { cpu[ 0 ], cpu[ 1 ], cpu[ 2 ], cpu[ 3 ] };
+			for( int corner = 0; corner < ( wSlack > 0.0f ? 12 : 4 ); ++corner )
+			{
+				const float pu = u + ( ( corner & 1 ) ? kUvSlack : -kUvSlack );
+				const float pv = v + ( ( corner & 2 ) ? kUvSlack : -kUvSlack );
+				Uniforms moved = un;
+				moved.level += ( corner >> 2 ) == 0 ? 0.0f : ( ( corner >> 2 ) == 1 ? wSlack : -wSlack );
+				float pa[ 4 ], pb[ 4 ], probe[ 4 ];
+				bilinear( aCard, W, H, pu, pv, pa );
+				bilinear( bCard, W, H, pu, pv, pb );
+				Shade( moved, pu, pv, pa, pb, probe );
+				for( int c = 0; c < 4; ++c )
+				{
+					lo[ c ] = std::min( lo[ c ], probe[ c ] );
+					hi[ c ] = std::max( hi[ c ], probe[ c ] );
+				}
+			}
+			bool inside = true;
+			for( int c = 0; c < 4; ++c )
+				inside = inside && gpu[ at + c ] >= lo[ c ] - kCpuTol && gpu[ at + c ] <= hi[ c ] + kCpuTol;
+			if( inside )
+				++t.onEdge;
+			else
+				++t.failed;
+		}
+	return t;
+}
+
+int runCpu()
+{
+	std::printf( "the OpenFX build's C++ shader (Pass.cpp's Shade) against the GLSL, pixel for pixel\n\n" );
+
+	const std::vector< CpuCase > cases = {
+		{ "Horizontal, Edge law, hard (the defaults)", {} },
+		{ "Circle, Area law, soft 16 px, red border 8 px soft 4",
+		  { { "Pattern", 4.0f }, { "Law", 1.0f }, { "Softness", 0.25f }, { "Border Width", 0.125f },
+		    { "Border Softness", 0.0625f }, { "Border Red", 1.0f }, { "Border Green", 0.0f }, { "Border Blue", 0.0f } } },
+		{ "Box 3x2, rotated 30 deg, off-centre, aspect 1.6, soft",
+		  { { "Pattern", 2.0f }, { "Multiple H", 3.0f }, { "Multiple V", 2.0f }, { "Rotation", 30.0f / 360.0f },
+		    { "Centre X", 0.35f }, { "Centre Y", 0.6f }, { "Aspect", 0.67f }, { "Softness", 0.1f } } },
+		{ "Clock x2, modulated, 0.2 s in",
+		  { { "Pattern", 5.0f }, { "Multiple H", 2.0f }, { "Mod Amount", 0.2f }, { "Mod Frequency", 0.6f },
+		    { "Mod Speed", 0.5f }, { "Centre X", 0.55f } } },
+		{ "Matrix, soft, border",
+		  { { "Pattern", 6.0f }, { "Softness", 0.2f }, { "Border Width", 0.1f }, { "Border Green", 0.3f } } },
+		{ "Diamond, Reverse, Area law, Aspect Comp off, soft 3.2 px",
+		  { { "Pattern", 3.0f }, { "Reverse", 1.0f }, { "Law", 1.0f }, { "Aspect Comp", 0.0f }, { "Softness", 0.05f } } },
+		{ "Vertical x3, modulated across",
+		  { { "Pattern", 1.0f }, { "Multiple V", 3.0f }, { "Mod Amount", 0.3f }, { "Mod Frequency", 0.3f } } },
+		{ "Circle 2x2, Area law, hard",
+		  { { "Pattern", 4.0f }, { "Multiple H", 2.0f }, { "Multiple V", 2.0f }, { "Law", 1.0f } } },
+	};
+	const float positions[] = { 0.0f, 0.1f, 0.35f, 0.5f, 0.8f, 1.0f };
+	const int rasters[ 2 ][ 2 ] = { { 640, 360 }, { 320, 180 } };
+	//Frame 0 sets the clock's epoch, frame 12 is 0.2 s on at 60 fps: the
+	//modulator has moved, and nothing else depends on time.
+	const int lastFrame = 12;
+
+	//One rig per raster, reset to the defaults between settings, as the
+	//other suites drive one: a plugin instance whose parameters a host moves,
+	//rather than ninety-six instances made and torn down.
+	std::vector< CpuTally > tallies( cases.size() );
+	double worstLevelGap = 0.0;
+	double worstSin      = 0.0;
+	const Wipe defaults;
+	for( const auto& r : rasters )
+	{
+		const int W = r[ 0 ], H = r[ 1 ];
+		const Image aCard = videoCard( W, H ), bCard = graphicCard( W, H );
+		Rig rig;
+		if( !rig.Init( W, H, true ) )
+			return 1;
+		rig.UploadA( aCard );
+		rig.UploadB( bCard );
+		for( size_t k = 0; k < cases.size(); ++k )
+		{
+			for( unsigned int i = 0; i < Wipe::PT_ABOUT_FIRST; ++i )
+				rig.plugin.SetFloatParameter( i, const_cast< Wipe& >( defaults ).GetFloatParameter( i ) );
+			for( const auto& setting : cases[ k ].settings )
+				if( !rig.Set( setting.first, setting.second ) )
+					return 1;
+			for( const float position : positions )
+			{
+				rig.Set( "Opacity", position );
+				if( !rig.Render( 0 ) || !rig.Render( lastFrame ) )
+					return 1;
+				const Wipe::State& state = rig.plugin.StateForTest();
+
+				//The OpenFX path: no Flip-Flop, the level solved afresh.
+				Pass pass  = BeginPass( hostValuesOf( rig.plugin ), false, W, H, state.elapsedSeconds );
+				pass.level = LevelFor( pass );
+				worstLevelGap = std::max( worstLevelGap, std::fabs( pass.level - state.level ) );
+
+				const Uniforms un = UniformsFor( pass );
+				const ImageF gpu  = rig.PixelsF();
+				float wSlack      = 0.0f;
+				if( un.modW > 0.0f && un.position > 0.0f && un.position < 1.0f )
+				{
+					const double sinError = rendererSin( rig, un );
+					if( sinError < 0.0 )
+						return 1;
+					worstSin = std::max( worstSin, sinError );
+					wSlack   = static_cast< float >( un.modW * std::max( sinError, kSinBound ) );
+				}
+				tallies[ k ].Add( compareCpu( gpu, aCard, bCard, W, H, un, wSlack ) );
+			}
+		}
+	}
+
+	CpuTally total;
+	for( size_t k = 0; k < cases.size(); ++k )
+	{
+		const CpuTally& tally = tallies[ k ];
+		Check( tally.failed == 0,
+		       std::string( cases[ k ].label ) + fmt( ":\n          8-bit: %.0f of %.0f px differ, worst %.0f/255;", static_cast< double >( tally.byteDiffers ), static_cast< double >( tally.pixels ), tally.worstCode )
+		           + fmt( " float off the edges: worst %.2e;", tally.worstFloat )
+		           + fmt( " %.0f edge px within the uv allowance, %.0f failed", static_cast< double >( tally.onEdge ), static_cast< double >( tally.failed ) ) );
+		total.Add( tally );
+	}
+	std::printf( "\n" );
+	Check( worstLevelGap == 0.0, fmt( "the OpenFX path's level is the FFGL plugin's, bitwise (worst gap %.1e)", worstLevelGap ) );
+	std::printf( "  this renderer's sin, over the modulator's arguments: worst %.2e (GLSL ES bounds [-pi, pi] at %.2e)\n", worstSin, kSinBound );
+	std::printf( "  all: %ld px over %d settings x %d positions x 2 rasters; 8-bit: %ld differ, worst %d/255; "
+	             "float off the edges: worst %.2e; %ld on an edge\n\n",
+	             total.pixels, static_cast< int >( cases.size() ), static_cast< int >( sizeof( positions ) / sizeof( positions[ 0 ] ) ),
+	             total.byteDiffers, total.worstCode, total.worstFloat, total.onEdge );
+
+	//The comparison can fail. A hard Horizontal wipe at half way, with the
+	//CPU's level ONE PIXEL further on: exactly one column must disagree.
+	{
+		const int W = 640, H = 360;
+		const Image aCard = videoCard( W, H ), bCard = graphicCard( W, H );
+		Rig rig;
+		if( !rig.Init( W, H, true ) )
+			return 1;
+		rig.UploadA( aCard );
+		rig.UploadB( bCard );
+		rig.Set( "Opacity", 0.5f );
+		if( !rig.Render( 0 ) )
+			return 1;
+		const ImageF gpu = rig.PixelsF();
+
+		Pass pass  = BeginPass( hostValuesOf( rig.plugin ), false, W, H, 0.0 );
+		pass.level = LevelFor( pass ) + pass.derived.unitsPerPixel;
+		const CpuTally shifted = compareCpu( gpu, aCard, bCard, W, H, UniformsFor( pass ) );
+		Negative( shifted.failed == H, fmt( "the CPU's edge one pixel over fails exactly one column (%.0f px of %.0f)", static_cast< double >( shifted.failed ), H ) );
+
+		HostValues circle = hostValuesOf( rig.plugin );
+		circle.pattern    = static_cast< float >( PAT_CIRCLE );
+		Pass wrong        = BeginPass( circle, false, W, H, 0.0 );
+		wrong.level       = LevelFor( wrong );
+		const CpuTally other = compareCpu( gpu, aCard, bCard, W, H, UniformsFor( wrong ) );
+		Negative( other.failed > W * H / 10, fmt( "the CPU on the wrong pattern (Circle) fails %.0f px", static_cast< double >( other.failed ) ) );
+	}
+	return failures == 0 ? 0 : 1;
+}
+
+//---------------------------------------------------------------------------
+// --cpu-bench: the OpenFX build's per-pixel cost at 1080p.
+//
+// What WipeOFX.cpp's processor does for an 8-bit RGBA frame -- read both
+// inputs, premultiply (a no-op on these opaque cards, but the multiply runs),
+// Shade, round to 8 bits -- sliced into rows across threads the way the OFX
+// Support library's ImageProcessor slices them, plus the per-frame CPU half
+// (BeginPass and the level). A real host supplies its own thread count;
+// this reports one thread and every core.
+//---------------------------------------------------------------------------
+double cpuFrame( const HostValues& host, const Image& aCard, const Image& bCard, Image& out, int W, int H, int threads )
+{
+	const auto start = std::chrono::steady_clock::now();
+	Pass pass        = BeginPass( host, false, W, H, 0.5 );
+	pass.level       = LevelFor( pass );
+	const Uniforms un = UniformsFor( pass );
+	const auto slice  = [ & ]( int y0, int y1 ) {
+		for( int y = y0; y < y1; ++y )
+		{
+			const float v = ( static_cast< float >( y ) + 0.5f ) / static_cast< float >( H );
+			for( int x = 0; x < W; ++x )
+			{
+				const size_t at = ( static_cast< size_t >( y ) * W + x ) * 4;
+				float a[ 4 ], b[ 4 ], px[ 4 ];
+				for( int c = 0; c < 4; ++c )
+				{
+					a[ c ] = static_cast< float >( aCard[ at + c ] ) / 255.0f;
+					b[ c ] = static_cast< float >( bCard[ at + c ] ) / 255.0f;
+				}
+				for( int c = 0; c < 3; ++c )
+				{
+					a[ c ] *= a[ 3 ];
+					b[ c ] *= b[ 3 ];
+				}
+				const float u = ( static_cast< float >( x ) + 0.5f ) / static_cast< float >( W );
+				Shade( un, u, v, a, b, px );
+				for( int c = 0; c < 4; ++c )
+					out[ at + c ] = static_cast< unsigned char >( code8( px[ c ] ) );
+			}
+		}
+	};
+	std::vector< std::thread > pool;
+	const int rows = ( H + threads - 1 ) / threads;
+	for( int t = 0; t < threads; ++t )
+		pool.emplace_back( slice, std::min( H, t * rows ), std::min( H, ( t + 1 ) * rows ) );
+	for( std::thread& thread : pool )
+		thread.join();
+	return std::chrono::duration< double >( std::chrono::steady_clock::now() - start ).count() * 1000.0;
+}
+
+int runCpuBench( int frames )
+{
+	const int W = 1920, H = 1080;
+	const Image aCard = videoCard( W, H ), bCard = graphicCard( W, H );
+	Image out( aCard.size() );
+	const int cores = std::max( 1u, std::thread::hardware_concurrency() );
+
+	struct Setting
+	{
+		const char* label;
+		HostValues host;
+	};
+	std::vector< Setting > settings;
+	{
+		HostValues h;//the GPU bench's: the most arithmetic per pixel
+		h.pattern    = static_cast< float >( PAT_MATRIX );
+		h.softness   = 0.3f;
+		h.borderWidth = 0.2f;
+		h.modAmount  = 0.2f;
+		settings.push_back( { "Matrix, soft, border, modulated", h } );
+		h          = HostValues();
+		h.pattern  = static_cast< float >( PAT_CIRCLE );
+		h.softness = 0.25f;
+		settings.push_back( { "Circle, soft (Edge law)", h } );
+		h.law       = static_cast< float >( LAW_AREA );
+		h.multipleH = 8.0f;
+		h.multipleV = 8.0f;
+		settings.push_back( { "Circle 8x8, soft, Area law (the worst solve)", h } );
+	}
+
+	std::printf( "1920x1080, 8-bit RGBA, %d frames each after one warm-up; median ms/frame\n\n", frames );
+	std::printf( "%-46s %10s %14s\n", "setting", "1 thread", fmt( "%.0f threads", cores ).c_str() );
+	for( const Setting& s : settings )
+	{
+		double result[ 2 ] = { 0.0, 0.0 };
+		const int counts[ 2 ] = { 1, cores };
+		for( int k = 0; k < 2; ++k )
+		{
+			cpuFrame( s.host, aCard, bCard, out, W, H, counts[ k ] );
+			std::vector< double > times;
+			for( int f = 0; f < frames; ++f )
+				times.push_back( cpuFrame( s.host, aCard, bCard, out, W, H, counts[ k ] ) );
+			std::sort( times.begin(), times.end() );
+			result[ k ] = times[ times.size() / 2 ];
+		}
+		std::printf( "%-46s %10.2f %14.2f\n", s.label, result[ 0 ], result[ 1 ] );
+	}
+	return 0;
+}
+
+//---------------------------------------------------------------------------
 // --bench
 //---------------------------------------------------------------------------
 double benchAt( int width, int height, int frames, double fps )
@@ -2013,6 +2517,8 @@ void usage()
 		"  --border          the border's width follows it too\n"
 		"  --modulation      the edge wobble is the stated sine, and it travels\n"
 		"  --flipflop        alternate transitions reverse\n"
+		"  --cpu             the OpenFX build's C++ shader against the GLSL, pixel for pixel\n"
+		"  --cpu-bench       the OpenFX build's CPU render at 1080p, one thread and all of them\n"
 		"  --bench           time ProcessOpenGL at 720p through 4K\n"
 		"  --pipe            raw RGBA Dest (A) frames on stdin, raw RGBA frames on stdout\n"
 		"  --pipe-src PATH   raw RGBA Src (B) frames for --pipe (a file or FIFO); default: --input-b, held\n"
@@ -2105,7 +2611,9 @@ int main( int argc, char** argv )
 		}
 		else if( argument == "--names" || argument == "--mixer" || argument == "--ends" || argument == "--edge"
 		         || argument == "--area" || argument == "--softness" || argument == "--border"
-		         || argument == "--modulation" || argument == "--flipflop" )
+		         || argument == "--modulation" || argument == "--flipflop" || argument == "--cpu" )
+			check = argument;
+		else if( argument == "--cpu-bench" )
 			check = argument;
 		else
 		{
@@ -2125,6 +2633,8 @@ int main( int argc, char** argv )
 		return runList();
 	if( check == "--names" )
 		return runNames();
+	if( check == "--cpu-bench" )
+		return runCpuBench( frames > 1 ? frames : 15 );
 
 	if( !cardPath.empty() )
 	{
@@ -2161,6 +2671,8 @@ int main( int argc, char** argv )
 		result = runModulation();
 	else if( check == "--flipflop" )
 		result = runFlipFlop();
+	else if( check == "--cpu" )
+		result = runCpu();
 	else if( wantBench )
 		result = runBench( frames > 1 ? frames : 60, fps );
 	else if( wantPipe )
