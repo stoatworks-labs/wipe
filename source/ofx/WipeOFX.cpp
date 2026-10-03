@@ -278,16 +278,22 @@ public:
 
 			for( int x = window.x1; x < window.x2; ++x, dst += nComponents )
 			{
-				if( s.end == 0 )
+				if( s.end >= 0 )
 				{
-					from.raw( x, out );
-					write( dst, out, false );
-					continue;
-				}
-				if( s.end == 1 )
-				{
-					to.raw( x, out );
-					write( dst, out, false );
+					//An end stop is the one input, untouched -- a raw copy when
+					//its alpha is stored the way the output's is, which is what
+					//makes it bit for bit; through premultiplied when not.
+					const SourceRow< PIX, maxValue >& only = s.end == 0 ? from : to;
+					if( only.straight == s.outStraight )
+					{
+						only.raw( x, out );
+						write( dst, out, false );
+					}
+					else
+					{
+						only.premultiplied( x, out );
+						write( dst, out, s.outStraight );
+					}
 					continue;
 				}
 
