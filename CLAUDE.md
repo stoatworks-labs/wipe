@@ -1,8 +1,9 @@
 # wipe
 
 A vision mixer's analogue pattern generator as an FFGL **mixer** for Resolume
-Arena/Avenue. C++/GLSL, CMake MODULE → universal `.bundle` (macOS) + Windows
-`.dll`. MIT. Not yet public, not yet released, never itself loaded into
+Arena/Avenue, and as an OpenFX **transition** for Resolve/Vegas/Nuke/Natron
+(`source/ofx/WipeOFX.cpp`). C++/GLSL, CMake MODULE → universal `.bundle`
+(macOS) + Windows `.dll`, and `Wipe.ofx.bundle` for macOS/Windows/Linux. MIT. Not yet public, not yet released, never itself loaded into
 Resolume (genlock, the first mixer, has been).
 
 Read `AGENTS.md` before changing the waveforms, the level laws, or any
@@ -14,6 +15,9 @@ of how an FFGL mixer behaves; the released copy with the Arena measurements is
 - Configure: `cmake -B build -DCMAKE_BUILD_TYPE=Release`
 - Fast dev build: add `-DCMAKE_OSX_ARCHITECTURES=arm64`
 - Build: `cmake --build build`
+- The OpenFX plugin builds alongside: `build/Wipe.ofx.bundle` (`-DBUILD_OFX=OFF`
+  to skip it). `-DWIPE_BUILD_FFGL=OFF` configures the OFX plugin alone with
+  nothing but a compiler — no FFGL SDK, no GLEW (the Linux job).
 - Install into Arena: `cmake --install build` → `~/Documents/Resolume Arena/Extra Effects`
   (yes, Extra Effects, although this is a mixer: Arena has one FFGL folder and
   no `Extra Mixers` — measured on genlock. See AGENTS.md.)
@@ -47,6 +51,11 @@ of how an FFGL mixer behaves; the released copy with the Arena measurements is
 - So does the border's: `./build/wptest --border`
 - The wobble is the stated sine and it travels: `./build/wptest --modulation`
 - Alternate transitions reverse: `./build/wptest --flipflop`
+- The OpenFX build's C++ shader IS the GLSL, pixel for pixel: `./build/wptest --cpu`
+- The OpenFX build's CPU cost at 1080p, 1 thread and all: `./build/wptest --cpu-bench`
+- The OFX bundle in a host: `ofxprobe --dir build` (the fleet's probe describes it
+  but hosts only the Filter context); a probe with `--context transition`
+  renders it — `OFXPROBE=/path/to/that/probe tools/verify.sh` makes verify.sh do so
 - ms/frame, 720p through 4K, and the Area law's CPU cost: `./build/wptest --bench`
 - No dead controls: `python3 tools/sweep.py` (`--size WxH`, `--jobs N`)
 - Any check on Apple's software renderer, as the GPU-less CI runner gets it:
@@ -102,6 +111,25 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
   `verify.sh`'s oxbow step assert it; Arena 7.27.1 confirmed it on Wipe
   (2026-09-23: the panel shows 25 of 26, and the missing one is Aspect Comp).
 - FFGL id is `WP01`. Display name `SW Wipe`.
+- **The CPU half of a frame is `Pass.cpp`, shared by both builds.**
+  `BeginPass` (the frame, the comparators in W units, the modulator's phase),
+  `LevelFor` (Edge law, or the Area solve) and `UniformsFor` (the floats the
+  shader gets) were the top of `ProcessOpenGL`; the FFGL build still calls
+  them, bit-for-bit as before. `HostValues` holds the defaults both builds
+  declare. Only the Flip-Flop and the Area-law cache stay in `Wipe.cpp`.
+- **`Shade` in Pass.cpp is the wipe shader mirrored in C++** (`//= mirrored`),
+  for the OpenFX CPU render. **Edit both.** `wptest --cpu` fails if they
+  drift. The GLSL's own marker is a C++ comment above `kWipeShader`, not
+  inside it, because `demo/plugin.js` must match the raw string to the
+  character.
+- **OpenFX: a Transition.** `com.stoatworks.wipe`, label `Wipe`, group
+  `Stoatworks`. SourceFrom = A (shown whole at Transition 0), SourceTo = B,
+  `Transition` = Opacity. Also declares the General context (same clips,
+  `Transition` an ordinary keyframeable param) for Nuke/Natron/Fusion. No
+  Flip-Flop (state across frames); the modulator's phase is
+  `time / fps × Mod Speed`; the Area law is solved every frame; inputs are read
+  pixel for pixel; pixel sizes scale with the render scale; Aspect Comp folds
+  in the pixel aspect (`Frame::pixelAspect`, 1 in FFGL). See AGENTS.md.
 - `demo/` is the browser demo at wipe-demo.stoatworks-labs.com: the plugin's two
   shaders unedited, `demo/waveform.js` a hand port of Controls.cpp, Waveform.cpp
   and the modulator phase, `demo/area-worker.js` the lattice Area solves off the
@@ -125,7 +153,12 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
 - CI: the Windows DLL compiles with MSVC; the macOS job is red because
   `--area` fails at 640×360 on four patterns on the GPU-less runner (see
   AGENTS.md). The other eight suites pass there.
-- No `Size` control (dropped, see AGENTS.md), no presets, no OpenFX port.
+- No `Size` control (dropped, see AGENTS.md), no presets.
+- **The OpenFX build has never been in a real host.** It agrees with the FFGL
+  plugin to 1/255 through a test host's Transition context (AGENTS.md, "The
+  OpenFX build"), but nobody has loaded it in Resolve, Vegas, Nuke or Natron:
+  which way round a host feeds SourceFrom/SourceTo, and how Resolve lists a
+  plugin that also declares the General context, are unseen.
 
 ## Diagnostics
 

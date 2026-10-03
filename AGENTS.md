@@ -3,7 +3,9 @@
 **What it is:** an FFGL 2.1 **mixer** for Resolume Arena/Avenue that makes its
 wipes the way a 1970s vision mixer did: from waveforms and a comparator, not
 from pictures. C++17 + GLSL 4.10, CMake, universal macOS `.bundle` and a
-Windows `.dll`. MIT. Home `github.com/stoatworks-labs/wipe`, released v0.1.0.
+Windows `.dll`; and the same wipe as an OpenFX **transition**
+(`Wipe.ofx.bundle`, macOS/Windows/Linux, CPU render) — see "The OpenFX build"
+below. MIT. Home `github.com/stoatworks-labs/wipe`, released v0.1.0.
 genlock, the fleet's first mixer, was measured in Arena 7.27.1 (Windows,
 2026-09-23), and this build was corrected to what that session measured; Wipe
 itself was then probed in the same Arena the same day — see "What genlock
@@ -105,6 +107,7 @@ systematic and does not average out.
 | `--modulation` shape | RMS residual **0.02 px** | After removing the fitted sine; a triangle wave would leave 1.6 px. Measured 0.0000. Negative control: at 3 cycles the projection is 0. |
 | `--modulation` travel | **0.02/16 rad** | The edge moves by −m sin( 2πfv − 2πφ ), so its fitted phase is π − 2πφ and a quarter second at 1 Hz is −π/2 = 3π/2 mod 2π. Asserted against that AND against the plugin's own reduced phase (0.250000). |
 | `--flipflop` | **zero bytes**, four transitions | Each arrival at an end from the other end flips the direction; the box after an odd transition is the Reverse-on box bitwise, after an even one the Reverse-off box. The first arrival counts for nothing; with Flip-Flop off nothing counts. |
+| `--cpu` | **zero failures**; reported: 65 of 13,824,000 px differ by 1/255, none by more, worst float 1.8e-5 (GPU) | The OpenFX build's C++ shader, `Shade`, against the GLSL on a float framebuffer: eight settings × six fader positions × both rasters, the CPU fed by the same `BeginPass`/`LevelFor`/`UniformsFor` path WipeOFX.cpp takes. Off the edges a pixel must agree to 1/1024 — float32 through the same formulae; a few ULPs of w through the softest comparator (3.2 px) is ~3e-4. On an edge the GPU may be anything the CPU gives inside the GL spec's 1e-5 allowance on `uv` (the `--area` figure), applied to everything the shader does with uv — the waveform AND both bilinear fetches — and, with the modulator on, inside ModW × this renderer's own `sin` error, which the check MEASURES with a one-pass render of the modulator's expression (GLSL sets no precision for sin; GLSL ES's 2^-11 covers [-π, π] only). GPU: sin 1.1e-7 off, no pixel needs any allowance. Software renderer: sin 1.1e-3 off, 667 edge pixels inside the allowances, 0 failures. Negative controls: the CPU's level one pixel on fails **exactly one column** (360 of 360); the CPU on the wrong pattern fails 115,194 px. Mutation-checked: the C++ comparator's 0.5 → 0.6 fails the four soft-edge settings and none of the hard ones. |
 | `--pipe` | not asserted | A filming mode in genlock's shape (`gltest --pipe`, e10444b): stdin is A, `--pipe-src` B, cues through the plugin's own setter, `SetTime` in milliseconds as Arena sends it. Verified by an ffmpeg round trip at 640×360 with B from a FIFO at 480×270: an `Opacity` ramp 0→1 opens a circle from all-A to all-B, a held Opacity with Mod Amount on changes the picture frame to frame (the clock moves), 2.5 frames on stdin give 2 out, and a misspelled cue is refused. |
 | `--bench` | not asserted | No threshold is worth asserting on somebody else's GPU. The Area-law solve is timed beside it because it is the one cost that is not trivial. |
 
@@ -257,15 +260,22 @@ folder. An install to Extra Mixers installs nothing Arena sees.
 
     source/Shaders.cpp      the pass. One vertex, one fragment. The waveform,
                             two comparators, the mix, and the matrix's Feistel.
+    source/Pass.*           the CPU half of a frame, for both builds: host
+                            values -> frame, comparators and phase -> level ->
+                            the shader's uniforms. And `Shade`, the wipe
+                            shader mirrored in C++ for the OpenFX build.
     source/Wipe.*           the plugin: type, parameters, the two inputs, the
                             flip-flop, the Area-law cache.
+    source/ofx/WipeOFX.cpp  the OpenFX transition: clips, params, the timeline
+                            clock, pixel marshalling. No wipe arithmetic.
     source/Waveform.*       the frame, the waveform's range, the pixel-to-W
                             factor, the closed-form areas, the solver, and
                             the C++ copy of the Feistel.
     source/Controls.*       0..1 host parameters to pixels, radians, Hz.
     source/Timing.*         the host clock, the epoch, the modulator's phase.
     source/Diag.*           a log file, for the shader that will not compile.
-    tools/wptest/           the offline harness. Two inputs, a float FBO.
+    tools/wptest/           the offline harness. Two inputs, a float FBO, and
+                            the OpenFX build's shader held to the GPU (--cpu).
     tools/sweep.py          no control is silently dead.
     tools/verify.sh         all of it.
 
@@ -471,8 +481,10 @@ plugin builds were loading the CPU. Take the ceiling.
 - **The spec's `Size` is not here**, for the reason above.
 - **Area law with modulation on** is the area of the unmodulated waveform;
   the sine's mean over a non-integer number of periods is not accounted for.
-- **No OpenFX port.** Not required for 0.1.0. The browser demo came later; see
-  *The browser demo* below.
+- **The OpenFX build has never been loaded in a real host.** It is held to the
+  FFGL plugin pixel for pixel (`--cpu`), and was rendered through a test host's
+  Transition context (see "The OpenFX build"), but not in Resolve, Vegas, Nuke
+  or Natron. The browser demo came later too; see *The browser demo* below.
 
 ---
 
@@ -587,6 +599,135 @@ reads 30 % B at a 30 % fader where the forward one reads 16 %. Deploy with
 `cf-run npx wrangler deploy` from the repo root, or push to main:
 `.github/workflows/deploy.yml` (idler's, added the same day) deploys `demo/`
 and checks the live `<head>` is this build.
+
+---
+
+## The OpenFX build
+
+Added 2026-10-03: `source/ofx/WipeOFX.cpp`, `Wipe.ofx.bundle`, the fleet's
+first OpenFX **Transition**. The fleet's other 22 ports are filters or
+generators; this is the first two-input one.
+
+**The mapping.** The FFGL build's input 0 is A, the layer below, shown whole at
+Opacity 0; input 1 is B, this layer, shown whole at Opacity 1. OpenFX's
+Transition context has the same shape: **SourceFrom** is A, shown whole at
+Transition 0; **SourceTo** is B, at 1; the spec-mandated `Transition` param
+(`kOfxImageEffectTransitionParamName`) is Opacity. So a timeline transition
+starts on the outgoing clip, and a Pattern opens the same way in both builds.
+`isIdentity` passes SourceFrom through at Transition ≤ 0 and SourceTo at ≥ 1 —
+the FFGL ends branch, done by the host — and the render branches at the ends
+as well, copying the input without a premultiply round trip, for a host that
+never asks.
+
+**What is shared, and what is mirrored.** `Pass.cpp` is the top of what was
+`ProcessOpenGL`: HostValues (the 0..1 controls, whose defaults both builds now
+declare from one place) → `BeginPass` (frame, comparators in W units,
+modulator phase) → `LevelFor` (Edge, or the Area solve) → `UniformsFor` (the
+floats the shader receives). The FFGL plugin calls it; its output did not move
+— eight distinct renders through `wptest --out` were byte-identical before and
+after the extraction (2026-10-03), and every suite still passes. `Shade` is
+the wipe shader's `main`, `waveform`, `cper`, `matrixRank` and `compare` in
+C++ float (`//= mirrored`; the matrix's Feistel is the existing `MatrixRank`);
+`wptest --cpu` holds it to the GLSL. WipeOFX.cpp contains no wipe arithmetic:
+OFX pixel formats in and out (8/16-bit and float, RGB and RGBA, straight alpha
+premultiplied on the way in and back out), the timeline clock, and a
+multi-threaded `OFX::ImageProcessor`.
+
+**Decisions taken without asking:**
+
+- **Transition AND General.** General has the same two clips and makes
+  `Transition` an ordinary keyframeable control; it is the only way Nuke,
+  Natron or Fusion, which host no Transition context, can use a two-input
+  effect. It costs no code, and Resolve's own transition sample
+  (`DissolveTransitionPlugin`, in Resolve's Developer/OpenFX folder) declares
+  the same pair. **How Resolve lists a plugin with both is unseen.** (That
+  sample's CPU path also swaps From and To once where its GPU path swaps them
+  twice; this build follows the spec, and which way Resolve feeds them is the
+  first thing to look at in Resolve.)
+- **No Flip-Flop.** It counts arrivals at the fader's ends — state carried
+  from frame to frame, which an OpenFX render may not have (frames come
+  alone, out of order, on several threads) — and a timeline transition is its
+  own instance with no previous transition to remember. Reverse, which
+  Flip-Flop only ever toggled, stays. The description and Reverse's hint say
+  why; the hint also says it is not a host's own reverse.
+- **The modulator's phase is `seconds × Mod Speed`**, seconds being the
+  frame's time over the clip's frame rate (the output's, else an input's,
+  else 25). The FFGL phase runs from the first frame drawn. Frame N rendered
+  alone, after 0..N−1, and after later frames is byte-identical.
+- **The Area law is solved every render**, never cached: a cache is mutable
+  state across renders. Under 0.1 ms for a single pattern; ~7.5 ms for a
+  Circle at Multiple 8×8 with the soft edge up, the worst there is.
+- **Inputs are read pixel for pixel** in the host's coordinates; outside an
+  input's bounds is transparent black, as OpenFX says. The FFGL build stretches
+  each layer over the output (two MaxUVs) because Resolume hands a mixer two
+  layers of any size; an OpenFX host conforms a transition's clips first, and
+  at matching sizes the two readings are the same texel.
+- **Pixel sizes follow the render scale** (Softness, Border Width, Border
+  Softness and Mod Amount are pixels of the full-size output) **and Aspect
+  Comp folds in the pixel aspect** — `Frame::pixelAspect`, which the FFGL
+  build leaves at 1, where Derive is bit-for-bit what it was. Resolume has
+  neither, so the demo's port of Derive does not need it.
+- **Parameter names** are the FFGL labels in camelCase (`pattern`, `law`,
+  `softness`, `borderWidth`, `borderSoftness`, `borderColour`, `centreX`,
+  `centreY`, `rotation`, `aspect`, `modAmount`, `modFrequency`, `modSpeed`,
+  `multipleH`, `multipleV`, `aspectComp`, `reverse`) plus the mandated
+  `Transition`. They are permanent: saved projects name them. The border
+  colour is one RGB param where FFGL declares three. Groups and order are the
+  FFGL build's; Aspect Comp is visible (only Arena hides a mixer's first
+  parameter). Tiles are declined: the waveform and the Area level belong to the
+  whole picture.
+
+**Verified (2026-10-03, Apple M4 Max, macOS 26.4.1):**
+
+- `wptest --cpu`: see the table above. Zero failures on the GPU and on the
+  software renderer.
+- **Through a host.** A test build of the fleet's ofxprobe that hosts the
+  Transition context (scratch, not yet in resolume-ofx-bridge) rendered
+  `Wipe.ofx` from the harness's own two cards at 640×360, against the FFGL
+  plugin's GPU render (`wptest --out`, 8-bit): 18 renders over eight settings
+  (defaults; Circle, Area law, soft, red border; Box 3×2 rotated off-centre;
+  Clock ×2 modulated at 0.2 s; Matrix soft with border; Diamond reversed, Area
+  law, Aspect Comp off; Vertical ×3 modulated; the two ends) — **52 of
+  4,147,200 pixels differ, worst 1/255**, and the same in float depth.
+  Transition 0 and 1 are the two cards **bitwise**, whether rendered or passed
+  through by isIdentity (which the host reported taking). A Box against the
+  FFGL Circle differs on 68,212 px. Determinism: frame 7 alone = after 0–6 =
+  after 20 and 3. The 1 Hz modulator repeats every 25 frames at 25 fps.
+- **Cost** through that host, 1920×1080 8-bit RGBA, its 8 threads, median of
+  nine: 2.8 ms (Horizontal, hard), 3.2 ms (Circle, soft), 6.4 ms (Matrix with
+  softness, border and modulator — the most per pixel), 7.8 ms (Circle 8×8,
+  Area law — the serial solve). One thread (`wptest --cpu-bench`): 23–47 ms.
+- `tools/verify.sh`: the bundle is universal, exports `OfxGetPlugin`, its
+  plist names the binary on disk and it ad-hoc signs; ofxprobe loads it as
+  `com.stoatworks.wipe` with the Transition and General contexts.
+  `-DWIPE_BUILD_FFGL=OFF` configures and builds with no FFGL SDK and no GLEW;
+  the OFX sources are warning-free under `-Wall -Wextra`.
+
+**The traps:**
+
+- **Apple's software renderer's `sin` is 1.1e-3 off** over the modulator's
+  arguments (the GPU's: 1.1e-7). GLSL sets no precision for sin at all, so a
+  hard, modulated edge lands 12–16 pixels differently there than on the GPU —
+  in the FFGL plugin itself, nothing to do with the port. `--cpu` measures the
+  renderer's sin rather than assuming a bound.
+- **The software renderer's `uv` moves the texture fetches too.** 9e-6 off a
+  texel centre blends a quarter of a percent of the next texel in, which at
+  a card's own hard edge is ~2/1000. The `--cpu` allowance reads the cards
+  bilinearly at its corners for that reason.
+- **The same-second make trap bit the mutation test.** Restoring Pass.cpp
+  within the second the mutant was compiled left the mutant's object in the
+  dev build, and `--cpu` there failed 143k pixels on the soft settings — a
+  second, accidental mutation test, and the reason the numbers above come
+  from a clean universal build.
+
+**Not verified:** any real OpenFX host. Which way round Resolve feeds
+SourceFrom/SourceTo, how its own transition controls (ratio, reverse, ease)
+reach `Transition`, how it lists a plugin that also declares General, and how
+it treats `isIdentity` on a transition are all open. The Windows build is
+compiled by CI and has not rendered a frame; the Linux build is compiled on
+AlmaLinux 8 and load-tested on Rocky 8 by CI, and has not rendered a frame.
+16-bit output and RGB-only clips are written and unexercised (the test host
+delivers 8-bit and float RGBA).
 
 ---
 

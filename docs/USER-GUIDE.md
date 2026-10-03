@@ -1,8 +1,11 @@
 # Wipe user guide
 
 Wipe is **a 1970s vision mixer's pattern generator**, as an FFGL **mixer** for
-[Resolume](https://resolume.com) Arena and Avenue. It wipes this layer in over the
-layer below, and it makes every wipe the way the hardware did: not from a stored
+[Resolume](https://resolume.com) Arena and Avenue, and as an OpenFX
+**transition** for DaVinci Resolve, Vegas, Nuke and Natron (see
+[OpenFX](#openfx-resolve-vegas-nuke-and-natron)). In Resolume it wipes this layer
+in over the layer below; as a transition, the next clip in over the last. Either
+way it makes every wipe the way the hardware did: not from a stored
 picture of a shape, but from a few waveforms (a horizontal ramp, a vertical ramp
 and their parabolas) compared against the fader. Soft edges, borders, the wobble
 of the modulator and the way a circle's edge is softer near its middle are all
@@ -338,6 +341,62 @@ and an error line if the shader failed to compile.
 
 ---
 
+## OpenFX: Resolve, Vegas, Nuke and Natron
+
+The OpenFX build is the same wipe as a **transition**. It is called **Wipe**,
+in the **Stoatworks** group. Every control in this guide is there under the
+same name and with the same range and default, except the ones listed below.
+
+**Installing.** Download the `wipe-ofx-` zip for your platform (macOS universal,
+Windows x64 or Linux x86_64; from the release after v0.1.0) and copy
+`Wipe.ofx.bundle` into the system OpenFX folder, then restart the host:
+
+```
+macOS    /Library/OFX/Plugins/
+Windows  C:\Program Files\Common Files\OFX\Plugins\
+Linux    /usr/OFX/Plugins/
+```
+
+**Using it.** Put it between two clips as a transition. The clip before the cut
+is **SourceFrom** and plays the part of A, the layer below; the clip after it is
+**SourceTo** and plays B. The host drives the **Transition** control from 0 to 1
+across the transition, which is this build's Opacity: at 0 you see only the
+outgoing clip, at 1 only the incoming one, and in between the wipe. At exactly
+0 and 1 the clip is passed through untouched.
+
+In a host without transitions (Nuke, Natron, or Resolve's Fusion page), Wipe is
+an effect with two inputs, SourceFrom and SourceTo. Wire both, and keyframe
+**Transition** from 0 to 1 yourself.
+
+**What is different:**
+
+- **There is no Flip-Flop.** It works by remembering the previous transition,
+  and each transition in a timeline is separate. Use **Reverse** on the
+  transitions you want to run the other way. Reverse mirrors the pattern, so a
+  Box closes instead of opening; it is not the same as a host's own option to
+  run a transition backwards.
+- **The wobble follows the timeline.** Mod Speed moves the modulator by the
+  time of the frame, so scrubbing shows it where playback will, and a render
+  is the same every time.
+- **Sizes in pixels are full-resolution pixels.** A proxy or half-resolution
+  preview draws them half as wide, so it looks the same. On an anamorphic
+  format, Aspect Comp keeps a circle round as displayed.
+- **The border colour is one colour control**, not three.
+- **Aspect Comp can be changed.** Only Resolume hides it.
+- **Area law is worked out for every frame.** It costs a few milliseconds at
+  most, for a Circle with both Multiples at 8.
+
+It renders on the CPU, on every core the host gives it: about 3 to 7 ms a frame
+at 1080p on an Apple M4 Max with eight threads.
+
+> **Not yet tried in a real host.** The OpenFX build has been checked against
+> the Resolume build pixel for pixel, and rendered through a test host's
+> transition, where it matches to within one level in 255. It has **not** been
+> loaded in DaVinci Resolve, Vegas, Nuke or Natron. If the wipe runs the wrong
+> way round in your host (it starts on the incoming clip), please report it.
+
+---
+
 ## Known limits
 
 - **Aspect Comp is hidden in Resolume.** Arena does not show a mixer's first
@@ -356,7 +415,10 @@ and an error line if the shader failed to compile.
 - **Area law with the modulator on** gives the area of the wipe without the
   wobble.
 - **Premultiplied alpha is assumed** for both pictures, and the border is opaque.
-- **No Size control**, no presets and no OpenFX version.
+- **No Size control**, and no presets.
+- **The OpenFX build has not been loaded in a real host yet.** See
+  [OpenFX](#openfx-resolve-vegas-nuke-and-natron). It has no Flip-Flop, by
+  design.
 - **There is a browser demo** at [wipe-demo.stoatworks-labs.com](https://wipe-demo.stoatworks-labs.com).
   It is a port to a web page, not the plugin: the shaders run in WebGL2 and any CPU
   half is rewritten in JavaScript. The page lists what it does not reproduce.

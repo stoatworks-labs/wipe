@@ -14,11 +14,15 @@
 > 7.27.1, is offered as a layer's Blend Mode and is driven by the layer's opacity
 > fader, on software rendering; no frame of its picture inside Resolume has been
 > captured. It is the fleet's second FFGL *mixer*, built to what the first,
-> genlock, measured in Arena. Check it in your own rig before trusting it in a
-> show.
+> genlock, measured in Arena. The OpenFX build — a **transition** — agrees with
+> the FFGL plugin to **1/255** on 52 of 4,147,200 pixels and exactly everywhere
+> else, rendered through a test host's Transition context; it has **not yet
+> been loaded in DaVinci Resolve** or any other real host. Check it in your own
+> rig before trusting it in a show.
 
 A 1970s vision mixer's analogue pattern generator, as an FFGL **mixer** for
-[Resolume](https://resolume.com) Arena and Avenue.
+[Resolume](https://resolume.com) Arena and Avenue — and as an OpenFX
+**transition** for DaVinci Resolve, Vegas, Nuke and Natron.
 
 ![A soft circle wipe with a modulated border, revealing one test card over another](docs/hero.png)
 
@@ -146,6 +150,74 @@ The spec's `Size` control is not here: in Edge law it would be the fader by
 another name, and in Area law it cancels out exactly. See
 [AGENTS.md](AGENTS.md).
 
+## OpenFX — Resolve, Vegas, Nuke, Natron
+
+The same wipe also builds as an OpenFX plugin, **Wipe** in the **Stoatworks**
+group, and there it is a **transition**: drop it between two clips in DaVinci
+Resolve or Vegas and the host's transition drives it. It is the same pattern
+generator — the same C++ for the frame, both fader laws and the parameter
+conversions, and the wipe shader mirrored in C++ and tested against the GLSL
+pixel for pixel — rendered on the CPU across every core.
+
+The OpenFX zip for your platform (`wipe-ofx-macos-universal.zip`,
+`wipe-ofx-windows-x86_64.zip` or `wipe-ofx-linux-x86_64.zip`, from the next
+release on) holds `Wipe.ofx.bundle`. Copy it into the standard OpenFX folder,
+then restart the host:
+
+```
+macOS    /Library/OFX/Plugins/
+Windows  C:\Program Files\Common Files\OFX\Plugins\
+Linux    /usr/OFX/Plugins/
+```
+
+**The two inputs and the fader** map straight across:
+
+| FFGL (Resolume) | OpenFX (Transition context) |
+| --- | --- |
+| A, the layer below — all of it at Opacity 0 | **SourceFrom**, the outgoing clip — all of it at Transition 0 |
+| B, this layer — all of it at Opacity 1 | **SourceTo**, the incoming clip — all of it at Transition 1 |
+| `Opacity`, the fader | **`Transition`**, which the host animates 0 → 1 |
+
+So a Box opens on the incoming clip exactly as far at Transition 0.3 as it
+opens on B at Opacity 0.3, and at exactly 0 and 1 the host is told to pass the
+one clip through untouched. The plugin also declares OpenFX's **General**
+context with the same two inputs, for hosts that have no transitions — Nuke,
+Natron, Resolve's Fusion page — where you wire both inputs yourself and
+keyframe `Transition` like any other control.
+
+**What is different from the FFGL build**, and why:
+
+- **No Flip-Flop.** In Resolume it remembers which end the fader last rested at
+  and reverses every other wipe. That is memory of the previous transition,
+  and an OpenFX transition is its own instance with no previous one; the host
+  also renders frames alone, out of order and on several threads. **Reverse**
+  is there, which is all Flip-Flop ever toggled. (It mirrors the pattern; a
+  host's own reverse control, where there is one, runs the transition
+  backwards instead.)
+- **The modulator runs on the timeline.** Mod Speed's phase is the frame's
+  time × the speed, so any frame renders on its own and scrubbing shows the
+  wobble where playback would. In Resolume the phase runs from the first frame
+  the mixer drew, the only clock a live mixer has.
+- **The Area law is solved every frame** rather than cached between frames;
+  it costs under 0.1 ms for any single pattern, and about 7.5 ms for a Circle
+  at Multiple 8 × 8.
+- **The inputs are read pixel for pixel** in the host's coordinates, as OpenFX
+  expects, where Resolume's mixer stretches each layer over the output. A host
+  conforms both clips to the timeline first, and at the same size the two are
+  the same reading.
+- **Pixel sizes follow the render scale and the pixel aspect.** Softness,
+  Border Width, Border Softness and Mod Amount are pixels of the full-size
+  output, so a half-resolution proxy draws them half as wide; and Aspect Comp
+  folds in the clip's pixel aspect, so a circle on an anamorphic format is
+  round on the display.
+- **The border colour is one colour control**, where FFGL declares Border Red,
+  Green and Blue. **Aspect Comp is visible** — only Resolume hides a mixer's
+  first parameter.
+- Wipe has no audio path and no beat sync, so nothing else is missing.
+
+Not yet verified: it has **not been loaded in DaVinci Resolve**, Vegas, Nuke or
+Natron. What has been checked, on this Mac, is in [Status](#status).
+
 ## Build
 
 Needs CMake and the Resolume FFGL SDK, which is a submodule.
@@ -160,6 +232,11 @@ cmake --install build    # → ~/Documents/Resolume Arena/Extra Effects
 
 macOS builds universal (arm64 + x86_64) by default. Add
 `-DCMAKE_OSX_ARCHITECTURES=arm64` for a faster development build.
+
+The same build makes the OpenFX plugin, `build/Wipe.ofx.bundle` (turn it off
+with `-DBUILD_OFX=OFF`). `-DWIPE_BUILD_FFGL=OFF` builds the OpenFX plugin alone
+with nothing but a compiler — no FFGL SDK, no GLEW — which is how the Linux
+build is made.
 
 The install path is **Extra Effects**, although this is a mixer. Resolume has one
 FFGL folder, and sources, effects and mixers all load from it: genlock, the
@@ -183,6 +260,8 @@ different sizes, with different hardware padding, rendered to a third size.
     ./build/wptest --border                 so does the border's
     ./build/wptest --modulation             the wobble is the stated sine, and it travels
     ./build/wptest --flipflop               alternate transitions reverse
+    ./build/wptest --cpu                    the OpenFX build's C++ shader against the GLSL, pixel for pixel
+    ./build/wptest --cpu-bench              the OpenFX build's CPU render at 1080p
     ./build/wptest --bench                  720p through 4K
     ./build/wptest --pipe --pipe-src F      two raw RGBA streams in, frames out (filming, not a check)
     python3 tools/sweep.py                  no control is silently dead
@@ -218,6 +297,11 @@ M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 | macOS binary | universal (`x86_64 arm64`), exports `plugMain`, ad-hoc signs |
 | Host metadata | `oxbow probe` reads **SW Wipe / WP01 / mixer / inputs 2..2**, parameter 0 **Aspect Comp** |
 | Render cost | **0.03 ms/frame at 720p, 0.04 at 1080p, 0.12 at 4K** (0.7% of a 60 fps frame), worst of several runs. Area law adds a CPU solve on the frames where something changed: under 0.06 ms for any single pattern, **2.8 ms for a box at Multiple 8×8 and 7.8 ms for a circle** on a quiet machine (6.9 and 16.9 with other builds loading the CPU) |
+| OpenFX: the C++ shader against the GLSL | `wptest --cpu`, eight settings covering every pattern, both laws, soft edge, border, positioner, rotation, aspect, Aspect Comp, Reverse, both Multiples and the modulator, six fader positions each, two rasters — 13,824,000 pixels: **65 differ by 1/255, none by more**, worst float difference 1.8e-5. On Apple's software renderer, which CI gets, it passes too, with every disagreement inside the GL spec's allowance for the picture coordinate or that renderer's own measured `sin` (1.1e-3 off). Negative controls: the CPU's edge moved one pixel fails **exactly one column**; one character changed in the C++ copy fails the four soft-edge settings |
+| OpenFX through a Transition host | `Wipe.ofx` in a test host's Transition context against the FFGL plugin's GPU render, same cards, 8-bit: 18 renders across eight settings — **52 of 4,147,200 pixels differ, worst 1/255**; the same in float depth. Transition 0 and 1 are the two clips **bitwise**, rendered or passed through by isIdentity. A Box against the FFGL Circle (the control) differs on 68,212 px |
+| OpenFX determinism | frame 7 rendered alone, after frames 0–6, and after 20 and 3 in one instance: **byte-identical**; the 1 Hz modulator repeats every 25 frames at 25 fps |
+| OpenFX render cost | **2.8 to 6.4 ms/frame at 1080p** on 8 threads (the test host's), 8-bit RGBA, median of nine; 7.8 ms for a Circle at Multiple 8×8 in Area law, which is the solve. One thread: 23 to 47 ms |
+| OpenFX binary | universal (`x86_64 arm64`), exports `OfxGetPlugin`, plist names the binary on disk, ad-hoc signs; a host loads it as `com.stoatworks.wipe` with the Transition and General contexts |
 
 Run `tools/verify.sh` before believing any of it.
 
@@ -255,7 +339,12 @@ includes that allowance, and `tools/verify.sh` runs every suite on the same
 software renderer locally. Nothing has run on a **GPU other than this
 Mac's**. The spec's `Size` control was dropped, for a stated reason.
 Area law with both Multiples high is the one setting whose CPU cost is worth
-knowing about. There are **no presets** and no OpenFX port. The
+knowing about. There are **no presets**. The OpenFX build has **never been
+loaded in a real host** — not DaVinci Resolve, Vegas, Nuke or Natron — so
+which way round a host feeds SourceFrom and SourceTo, how its own transition
+controls drive `Transition`, and how it lists a plugin that also declares the
+General context are all unseen; its Windows and Linux builds are compiled and
+(Linux) load-tested on Rocky 8 in CI, and have not rendered a frame. The
 [browser demo](https://wipe-demo.stoatworks-labs.com) is a port, not the plugin.
 The [user guide](docs/USER-GUIDE.md) covers every control, and the About
 block's fourth button opens it.
