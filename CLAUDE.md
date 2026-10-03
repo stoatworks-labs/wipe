@@ -55,7 +55,10 @@ of how an FFGL mixer behaves; the released copy with the Arena measurements is
 - The OpenFX build's CPU cost at 1080p, 1 thread and all: `./build/wptest --cpu-bench`
 - The OFX bundle in a host: `ofxprobe --dir build` (the fleet's probe describes it
   but hosts only the Filter context); a probe with `--context transition`
-  renders it — `OFXPROBE=/path/to/that/probe tools/verify.sh` makes verify.sh do so
+  renders it — `OFXPROBE=/path/to/that/probe tools/verify.sh` makes verify.sh do so,
+  and if it also has `--quirks fusion` (Resolve's Fusion page: no frame rate
+  anywhere) verify.sh renders the General context that way and checks the
+  modulator falls back to 24 fps
 - ms/frame, 720p through 4K, and the Area law's CPU cost: `./build/wptest --bench`
 - No dead controls: `python3 tools/sweep.py` (`--size WxH`, `--jobs N`)
 - Any check on Apple's software renderer, as the GPU-less CI runner gets it:
@@ -154,11 +157,13 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
   `--area` fails at 640×360 on four patterns on the GPU-less runner (see
   AGENTS.md). The other eight suites pass there.
 - No `Size` control (dropped, see AGENTS.md), no presets.
-- **The OpenFX build has never been in a real host.** It agrees with the FFGL
-  plugin to 1/255 through a test host's Transition context (AGENTS.md, "The
-  OpenFX build"), but nobody has loaded it in Resolve, Vegas, Nuke or Natron:
-  which way round a host feeds SourceFrom/SourceTo, and how Resolve lists a
-  plugin that also declares the General context, are unseen.
+- **The OpenFX build has been in one real host**: Resolve 21.1's Edit page,
+  as a transition, with the clip order and the progress right (the lead,
+  2026-10-03). Fusion provides no frame rate at all and the first build failed
+  there; `framesPerSecond()` now catches every read and falls back to 24 —
+  checked under the test host's `--quirks fusion`, not yet in Fusion. Never
+  read a host property in a render path without a catch. Vegas, Nuke and
+  Natron untried.
 
 ## Diagnostics
 

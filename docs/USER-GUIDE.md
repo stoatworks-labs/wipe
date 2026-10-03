@@ -377,7 +377,8 @@ an effect with two inputs, SourceFrom and SourceTo. Wire both, and keyframe
   run a transition backwards.
 - **The wobble follows the timeline.** Mod Speed moves the modulator by the
   time of the frame, so scrubbing shows it where playback will, and a render
-  is the same every time.
+  is the same every time. Fusion reports no frame rate; there, Mod Speed
+  assumes 24 fps.
 - **Sizes in pixels are full-resolution pixels.** A proxy or half-resolution
   preview draws them half as wide, so it looks the same. On an anamorphic
   format, Aspect Comp keeps a circle round as displayed.
@@ -389,11 +390,13 @@ an effect with two inputs, SourceFrom and SourceTo. Wire both, and keyframe
 It renders on the CPU, on every core the host gives it: about 3 to 7 ms a frame
 at 1080p on an Apple M4 Max with eight threads.
 
-> **Not yet tried in a real host.** The OpenFX build has been checked against
-> the Resolume build pixel for pixel, and rendered through a test host's
-> transition, where it matches to within one level in 255. It has **not** been
-> loaded in DaVinci Resolve, Vegas, Nuke or Natron. If the wipe runs the wrong
-> way round in your host (it starts on the incoming clip), please report it.
+> **Where it has been tried.** The OpenFX build has been checked against the
+> Resolume build pixel for pixel, and rendered through a test host's
+> transition, where it matches to within one level in 255. In **DaVinci Resolve
+> 21.1** it works as an Edit-page transition, the right way round. It has not
+> yet been tried in Resolve's Fusion page, Vegas, Nuke or Natron. If the wipe
+> runs the wrong way round in your host (it starts on the incoming clip),
+> please report it.
 
 ---
 
@@ -416,9 +419,9 @@ at 1080p on an Apple M4 Max with eight threads.
   wobble.
 - **Premultiplied alpha is assumed** for both pictures, and the border is opaque.
 - **No Size control**, and no presets.
-- **The OpenFX build has not been loaded in a real host yet.** See
+- **The OpenFX build has been tried only in DaVinci Resolve's Edit page.** See
   [OpenFX](#openfx-resolve-vegas-nuke-and-natron). It has no Flip-Flop, by
-  design.
+  design, and in Fusion, which reports no frame rate, Mod Speed assumes 24 fps.
 - **There is a browser demo** at [wipe-demo.stoatworks-labs.com](https://wipe-demo.stoatworks-labs.com).
   It is a port to a web page, not the plugin: the shaders run in WebGL2 and any CPU
   half is rewritten in JavaScript. The page lists what it does not reproduce.

@@ -481,10 +481,12 @@ plugin builds were loading the CPU. Take the ceiling.
 - **The spec's `Size` is not here**, for the reason above.
 - **Area law with modulation on** is the area of the unmodulated waveform;
   the sine's mean over a non-integer number of periods is not accounted for.
-- **The OpenFX build has never been loaded in a real host.** It is held to the
-  FFGL plugin pixel for pixel (`--cpu`), and was rendered through a test host's
-  Transition context (see "The OpenFX build"), but not in Resolve, Vegas, Nuke
-  or Natron. The browser demo came later too; see *The browser demo* below.
+- **The OpenFX build has been in one real host**, Resolve 21.1's Edit page,
+  as a transition (see "The OpenFX build"). It is held to the FFGL plugin pixel
+  for pixel (`--cpu`) and was rendered through a test host's Transition
+  context; Resolve's Fusion page is checked only through that host's Fusion
+  quirks, and Vegas, Nuke and Natron not at all. The browser demo came later
+  too; see *The browser demo* below.
 
 ---
 
@@ -640,10 +642,11 @@ multi-threaded `OFX::ImageProcessor`.
   Natron or Fusion, which host no Transition context, can use a two-input
   effect. It costs no code, and Resolve's own transition sample
   (`DissolveTransitionPlugin`, in Resolve's Developer/OpenFX folder) declares
-  the same pair. **How Resolve lists a plugin with both is unseen.** (That
-  sample's CPU path also swaps From and To once where its GPU path swaps them
-  twice; this build follows the spec, and which way Resolve feeds them is the
-  first thing to look at in Resolve.)
+  the same pair. (That sample's CPU path also swaps From and To once where its
+  GPU path swaps them twice; this build follows the spec, and in Resolve 21.1
+  the spec's order is what arrives -- see "In DaVinci Resolve" below.) General
+  is also what makes Wipe a Fusion tool, which is where the frame-rate trap
+  below came from.
 - **No Flip-Flop.** It counts arrivals at the fader's ends — state carried
   from frame to frame, which an OpenFX render may not have (frames come
   alone, out of order, on several threads) — and a timeline transition is its
@@ -651,9 +654,11 @@ multi-threaded `OFX::ImageProcessor`.
   Flip-Flop only ever toggled, stays. The description and Reverse's hint say
   why; the hint also says it is not a host's own reverse.
 - **The modulator's phase is `seconds × Mod Speed`**, seconds being the
-  frame's time over the clip's frame rate (the output's, else an input's,
-  else 25). The FFGL phase runs from the first frame drawn. Frame N rendered
-  alone, after 0..N−1, and after later frames is byte-identical.
+  frame's time over the frame rate -- the output clip's, else either input's,
+  else the effect's, each read caught, else **24**, Resolve's default timeline
+  rate (`framesPerSecond`). The FFGL phase runs from the first frame drawn.
+  Frame N rendered alone, after 0..N−1, and after later frames is
+  byte-identical.
 - **The Area law is solved every render**, never cached: a cache is mutable
   state across renders. Under 0.1 ms for a single pattern; ~7.5 ms for a
   Circle at Multiple 8×8 with the soft edge up, the worst there is.
@@ -705,6 +710,13 @@ multi-threaded `OFX::ImageProcessor`.
 
 **The traps:**
 
+- **A host property that is missing must never escape a render.** The Support
+  library's getters throw when a host lacks a property, and an exception out of
+  `render` is a failed frame. Resolve's Fusion page has no frame rate anywhere,
+  and the first build -- whose fps read was guarded against zero but not
+  against absence -- failed every Fusion render while working on the Edit
+  page. Every clip-property read in WipeOFX.cpp is now inside a catch with a
+  stated default.
 - **Apple's software renderer's `sin` is 1.1e-3 off** over the modulator's
   arguments (the GPU's: 1.1e-7). GLSL sets no precision for sin at all, so a
   hard, modulated edge lands 12–16 pixels differently there than on the GPU —
@@ -720,14 +732,46 @@ multi-threaded `OFX::ImageProcessor`.
   second, accidental mutation test, and the reason the numbers above come
   from a clean universal build.
 
-**Not verified:** any real OpenFX host. Which way round Resolve feeds
-SourceFrom/SourceTo, how its own transition controls (ratio, reverse, ease)
-reach `Transition`, how it lists a plugin that also declares General, and how
-it treats `isIdentity` on a transition are all open. The Windows build is
-compiled by CI and has not rendered a frame; the Linux build is compiled on
-AlmaLinux 8 and load-tested on Rocky 8 by CI, and has not rendered a frame.
-16-bit output and RGB-only clips are written and unexercised (the test host
-delivers 8-bit and float RGBA).
+**In DaVinci Resolve** (Studio 21.1, macOS, through OFX_PLUGIN_PATH; the
+lead, 2026-10-03):
+
+- **Edit page, as a transition: works.** Added with
+  `TimelineItem.AddTransition`, category "ofx". The frames before the
+  transition are exactly SourceFrom and the frames after it exactly SourceTo,
+  so the spec's order is the order Resolve feeds. Progress is linear across
+  24 frames, and Resolve sends **Transition ≈ (n + 0.5)/24** -- the middle of
+  each frame, never exactly 0 or 1 -- so inside a Resolve transition
+  `isIdentity` never fires and every frame is rendered.
+- **Fusion page, as a tool (the General context): the first build FAILED.**
+  Resolve's Fusion page provides no frame rate at all -- not on the effect,
+  not on any clip -- and reports FrameRange [0, 0], with the Unmapped pair and
+  the two render-status properties absent. The Support library threw
+  `PropertyUnknownToHost: OfxImageEffectPropFrameRate` out of `render` as
+  kOfxStatErrMissingHostFeature, and Fusion reported that the composition
+  "could not be processed". **Fixed:** `framesPerSecond()` catches every read
+  and falls back to 24; `isConnected`, the premultiplication and the
+  components are read inside a catch too. Nothing here reads FrameRange, the
+  Unmapped pair or the render statuses, and no temporal fetch exists to clamp.
+  **Checked under the test host's `--quirks fusion`**, which removes the frame
+  rate from the effect and every clip, sets clip FrameRange to [0, 0] and drops
+  the Unmapped pair and the render statuses, as Fusion does (2026-10-04): the
+  first build (cc39f44) fails there, General context and Transition context
+  alike, with `kOfxStatErrMissingHostFeature` -- the failure Fusion showed --
+  and this one renders. The probe feeds Wipe's two named clips only in the
+  Transition context, so the picture is compared there: under the quirk,
+  Vertical ×3 modulated at frame 5 is **byte-identical** to the same render
+  from a host reporting 24 fps and differs from 25 fps; in the General context
+  (inputs unconnected) the quirk render is byte-identical to the 24 fps one too.
+  Every normal-host result above is unchanged to the hash. verify.sh runs the
+  quirk renders when OFXPROBE has `--quirks`. **Not yet re-run in Fusion
+  itself.**
+
+**Not verified:** Vegas, Nuke, Natron. How Resolve's own transition controls
+(ratio, reverse, ease) reach `Transition` beyond the default linear one. The
+Windows build is compiled by CI and has not rendered a frame; the Linux build
+is compiled on AlmaLinux 8 and load-tested on Rocky 8 by CI, and has not
+rendered a frame. 16-bit output and RGB-only clips are written and
+unexercised (the test host delivers 8-bit and float RGBA).
 
 ---
 

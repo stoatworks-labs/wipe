@@ -16,9 +16,10 @@
 > captured. It is the fleet's second FFGL *mixer*, built to what the first,
 > genlock, measured in Arena. The OpenFX build — a **transition** — agrees with
 > the FFGL plugin to **1/255** on 52 of 4,147,200 pixels and exactly everywhere
-> else, rendered through a test host's Transition context; it has **not yet
-> been loaded in DaVinci Resolve** or any other real host. Check it in your own
-> rig before trusting it in a show.
+> else, rendered through a test host's Transition context. In **DaVinci Resolve
+> 21.1** it works as an Edit-page transition (checked by the lead, 2026-10-03);
+> it has not been tried in Vegas, Nuke or Natron. Check it in your own rig
+> before trusting it in a show.
 
 A 1970s vision mixer's analogue pattern generator, as an FFGL **mixer** for
 [Resolume](https://resolume.com) Arena and Avenue — and as an OpenFX
@@ -197,7 +198,8 @@ keyframe `Transition` like any other control.
 - **The modulator runs on the timeline.** Mod Speed's phase is the frame's
   time × the speed, so any frame renders on its own and scrubbing shows the
   wobble where playback would. In Resolume the phase runs from the first frame
-  the mixer drew, the only clock a live mixer has.
+  the mixer drew, the only clock a live mixer has. **Fusion reports no frame
+  rate; there, Mod Speed assumes 24 fps.**
 - **The Area law is solved every frame** rather than cached between frames;
   it costs under 0.1 ms for any single pattern, and about 7.5 ms for a Circle
   at Multiple 8 × 8.
@@ -215,8 +217,16 @@ keyframe `Transition` like any other control.
   first parameter.
 - Wipe has no audio path and no beat sync, so nothing else is missing.
 
-Not yet verified: it has **not been loaded in DaVinci Resolve**, Vegas, Nuke or
-Natron. What has been checked, on this Mac, is in [Status](#status).
+**In DaVinci Resolve 21.1** (Studio, macOS; checked by the lead, 2026-10-03) it
+works as an Edit-page transition: the frames before it are exactly the outgoing
+clip and the frames after it exactly the incoming one, and the progress is
+linear — Resolve sends Transition ≈ (n + 0.5)/24 across a 24-frame transition,
+never exactly 0 or 1. Its General context makes it a Fusion tool too, and
+Fusion provides no frame rate at all; the first build failed to render there
+for that reason, and this one falls back to 24 fps (checked under a test host
+that reproduces Fusion's missing properties, not yet in Fusion itself). Not
+tried in Vegas, Nuke or Natron. What else has been checked is in
+[Status](#status).
 
 ## Build
 
@@ -299,6 +309,7 @@ M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
 | Render cost | **0.03 ms/frame at 720p, 0.04 at 1080p, 0.12 at 4K** (0.7% of a 60 fps frame), worst of several runs. Area law adds a CPU solve on the frames where something changed: under 0.06 ms for any single pattern, **2.8 ms for a box at Multiple 8×8 and 7.8 ms for a circle** on a quiet machine (6.9 and 16.9 with other builds loading the CPU) |
 | OpenFX: the C++ shader against the GLSL | `wptest --cpu`, eight settings covering every pattern, both laws, soft edge, border, positioner, rotation, aspect, Aspect Comp, Reverse, both Multiples and the modulator, six fader positions each, two rasters — 13,824,000 pixels: **65 differ by 1/255, none by more**, worst float difference 1.8e-5. On Apple's software renderer, which CI gets, it passes too, with every disagreement inside the GL spec's allowance for the picture coordinate or that renderer's own measured `sin` (1.1e-3 off). Negative controls: the CPU's edge moved one pixel fails **exactly one column**; one character changed in the C++ copy fails the four soft-edge settings |
 | OpenFX through a Transition host | `Wipe.ofx` in a test host's Transition context against the FFGL plugin's GPU render, same cards, 8-bit: 18 renders across eight settings — **52 of 4,147,200 pixels differ, worst 1/255**; the same in float depth. Transition 0 and 1 are the two clips **bitwise**, rendered or passed through by isIdentity. A Box against the FFGL Circle (the control) differs on 68,212 px |
+| OpenFX without a frame rate | Resolve's Fusion page reports none, and the first build failed to render there (the lead, Resolve 21.1). Under a test host that removes it the same way (`--quirks fusion`): the first build fails with `kOfxStatErrMissingHostFeature` in the General and Transition contexts; this one renders, **byte-identical to a 24 fps render** and unlike a 25 fps one. Not yet re-run in Fusion itself |
 | OpenFX determinism | frame 7 rendered alone, after frames 0–6, and after 20 and 3 in one instance: **byte-identical**; the 1 Hz modulator repeats every 25 frames at 25 fps |
 | OpenFX render cost | **2.8 to 6.4 ms/frame at 1080p** on 8 threads (the test host's), 8-bit RGBA, median of nine; 7.8 ms for a Circle at Multiple 8×8 in Area law, which is the solve. One thread: 23 to 47 ms |
 | OpenFX binary | universal (`x86_64 arm64`), exports `OfxGetPlugin`, plist names the binary on disk, ad-hoc signs; a host loads it as `com.stoatworks.wipe` with the Transition and General contexts |
@@ -339,12 +350,13 @@ includes that allowance, and `tools/verify.sh` runs every suite on the same
 software renderer locally. Nothing has run on a **GPU other than this
 Mac's**. The spec's `Size` control was dropped, for a stated reason.
 Area law with both Multiples high is the one setting whose CPU cost is worth
-knowing about. There are **no presets**. The OpenFX build has **never been
-loaded in a real host** — not DaVinci Resolve, Vegas, Nuke or Natron — so
-which way round a host feeds SourceFrom and SourceTo, how its own transition
-controls drive `Transition`, and how it lists a plugin that also declares the
-General context are all unseen; its Windows and Linux builds are compiled and
-(Linux) load-tested on Rocky 8 in CI, and have not rendered a frame. The
+knowing about. There are **no presets**. The OpenFX build has been in **one
+real host**, DaVinci Resolve 21.1 on macOS, as an Edit-page transition, where
+the clip order and the progress are right (checked by the lead); the Fusion
+fix is so far checked only against a test host that reproduces Fusion's
+missing frame rate, and Vegas, Nuke and Natron are untried. Its Windows and
+Linux builds are compiled and (Linux) load-tested on Rocky 8 in CI, and have
+not rendered a frame. The
 [browser demo](https://wipe-demo.stoatworks-labs.com) is a port, not the plugin.
 The [user guide](docs/USER-GUIDE.md) covers every control, and the About
 block's fourth button opens it.
