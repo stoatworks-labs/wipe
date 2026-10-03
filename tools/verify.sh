@@ -17,6 +17,9 @@
 #                 area where Area law puts it, the soft edge and the border
 #                 following the waveform's slope, the modulator's sine, and
 #                 the flip-flop
+#   cpu           (one of the suites) the OpenFX build's C++ copy of the
+#                 wipe shader, Pass.cpp's Shade, against the GLSL pixel for
+#                 pixel: the mirror cannot drift without failing here
 #   software      the same suites on Apple's software renderer, which is
 #                 what a GPU-less CI runner gets: a check calibrated on this
 #                 Mac's GPU fails here before it fails in CI
@@ -40,6 +43,11 @@
 #                 would notice if it were wrong, and a mixer that
 #                 registered as an effect would be handed one input and
 #                 return FF_FAIL for ever.
+#   openfx        the OpenFX bundle: universal, exports OfxGetPlugin, its
+#                 plist names the binary on disk and it ad-hoc signs (the
+#                 release job's command), and a host loads it and sees a
+#                 Transition -- and renders one, given a probe that can host
+#                 the Transition context
 #   bench         the render cost, for the record. Not pass/fail -- there is
 #                 no threshold worth asserting on somebody else's GPU -- but
 #                 a verify run leaves a timing on the record, which is what
@@ -184,7 +192,7 @@ fi
 WPTEST="$BUILD/wptest"
 
 step "suites"
-for t in names mixer ends edge area softness border modulation flipflop; do
+for t in names mixer ends edge area softness border modulation flipflop cpu; do
 	if "$WPTEST" --$t >/dev/null 2>&1; then pass "wptest --$t"; else fail "wptest --$t"; fi
 done
 
@@ -197,7 +205,7 @@ done
 #---------------------------------------------------------------------------
 step "software renderer"
 if [ "$(uname)" = "Darwin" ]; then
-	for t in mixer ends edge area softness border modulation flipflop; do
+	for t in mixer ends edge area softness border modulation flipflop cpu; do
 		if WPTEST_RENDERER=software "$WPTEST" --$t >/dev/null 2>&1; then
 			pass "wptest --$t (software)"
 		else
@@ -293,6 +301,119 @@ if [ "$(uname)" = "Darwin" ] && [ -d "$BUNDLE" ]; then
 		esac
 	else
 		printf '   skipped: oxbow not built at %s\n' "$OXBOW"
+	fi
+fi
+
+#---------------------------------------------------------------------------
+# The OpenFX bundle.
+#
+# cmake/InfoOFX.plist.in is copied from repo to repo, and the version it is
+# usually copied from had the PREVIOUS plugin's name hardcoded into
+# CFBundleExecutable. That does not fail the build: the bundle assembles, lipo
+# and nm both pass, and a host loads it. It fails at RELEASE time, in codesign,
+# with "code object is not signed at all / In subcomponent: .../<name>.ofx" --
+# because codesign reads the plist, looks for an executable that is not there,
+# and treats the real binary as a nested object that should have been signed
+# first. Nothing in that message mentions the plist. So: check the plist
+# against the binary on disk, and run the exact codesign the release job runs,
+# against a COPY.
+#
+# Then load it the way a host does. The fleet's ofxprobe instantiates only the
+# Filter context, and this is a Transition, so it can only describe it -- which
+# still proves it loads, registers, and declares the contexts it should. Point
+# OFXPROBE at a probe that can host the Transition context (its usage mentions
+# --context) and this also renders one half-way through and checks the ends
+# pass their input through.
+#---------------------------------------------------------------------------
+OFX_BUNDLE="$BUILD/Wipe.ofx.bundle"
+OFX_BIN="$OFX_BUNDLE/Contents/MacOS/Wipe.ofx"
+if [ "$(uname)" = "Darwin" ]; then
+	step "openfx"
+	if [ ! -f "$OFX_BIN" ]; then
+		fail "no OpenFX bundle at $OFX_BUNDLE (configured with -DBUILD_OFX=OFF?)"
+	else
+		archs=$(lipo -archs "$OFX_BIN" 2>/dev/null)
+		case "$archs" in *arm64*) pass "OpenFX arm64 present" ;; *) fail "OpenFX: no arm64 (got: $archs)" ;; esac
+		case "$archs" in *x86_64*) pass "OpenFX x86_64 present" ;; *) fail "OpenFX: no x86_64 (got: $archs)" ;; esac
+
+		# Captured, not piped into grep -q: see the registration step.
+		syms=$(nm -gU "$OFX_BIN" 2>/dev/null)
+		case "$syms" in
+			*_OfxGetPlugin*) pass "exports OfxGetPlugin" ;;
+			*) fail "no OfxGetPlugin -- no OFX host will see a plugin" ;;
+		esac
+
+		named=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$OFX_BUNDLE/Contents/Info.plist" 2>/dev/null)
+		ident=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$OFX_BUNDLE/Contents/Info.plist" 2>/dev/null)
+		if [ -n "$named" ] && [ -f "$OFX_BUNDLE/Contents/MacOS/$named" ]; then
+			pass "CFBundleExecutable ($named) is on disk"
+		else
+			fail "CFBundleExecutable is '$named' but no such binary exists -- codesign will fail after the tag"
+		fi
+		if [ "$ident" = "com.stoatworks.wipe.ofx" ]; then
+			pass "CFBundleIdentifier is $ident"
+		else
+			fail "CFBundleIdentifier is '$ident'"
+		fi
+
+		tmp=$(mktemp -d)
+		cp -R "$OFX_BUNDLE" "$tmp/"
+		if codesign --force --sign - --timestamp=none "$tmp/Wipe.ofx.bundle" >/dev/null 2>&1; then
+			pass "the OpenFX bundle ad-hoc signs (the command the release job runs)"
+		else
+			fail "the OpenFX bundle will not codesign"
+			codesign --force --sign - --timestamp=none "$tmp/Wipe.ofx.bundle" 2>&1 | sed 's/^/       /'
+		fi
+
+		OFXPROBE="${OFXPROBE:-$HOME/Projects/resolume/resolume-ofx-bridge/build/ofxprobe}"
+		if [ ! -x "$OFXPROBE" ]; then
+			printf '   skipped: ofxprobe not built at %s -- the OpenFX bundle is unloaded\n' "$OFXPROBE"
+		else
+			# A scratch directory holding only this bundle, so an installed copy
+			# under /Library/OFX/Plugins cannot answer in its place: --dir adds a
+			# path, it does not replace the system ones.
+			only="$tmp/only"
+			mkdir -p "$only"
+			cp -R "$OFX_BUNDLE" "$only/"
+			usage=$("$OFXPROBE" --help 2>&1)
+			case "$usage" in *--no-system-dirs*) isolate="--no-system-dirs" ;; *) isolate="" ;; esac
+			listing=$("$OFXPROBE" $isolate --dir "$only" 2>&1)
+			case "$listing" in
+				*"com.stoatworks.wipe"*"$only/Wipe.ofx.bundle"*) pass "a host loads it as com.stoatworks.wipe" ;;
+				*) fail "the host did not load com.stoatworks.wipe from this build"; printf '%s\n' "$listing" | sed -n '1,12s/^/       /p' ;;
+			esac
+			case "$listing" in
+				*"OfxImageEffectContextTransition"*"OfxImageEffectContextGeneral"*) pass "and sees the Transition and General contexts" ;;
+				*) fail "the Transition/General contexts are not declared" ;;
+			esac
+
+			case "$usage" in
+				*--context*)
+					frame="$only/half.ppm"
+					rendered=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context transition \
+					           --size 320x180 --transition 0.5 --out-only "$frame" 2>&1)
+					from=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context transition \
+					       --size 320x180 --transition 0 2>&1)
+					to=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context transition \
+					     --size 320x180 --transition 1 2>&1)
+					hashOf() { printf '%s\n' "$1" | sed -n 's/.*out hash *//p'; }
+					case "$rendered" in
+						*"rendered 320x180"*) pass "it renders a Transition half-way ($(hashOf "$rendered"))" ;;
+						*) fail "the Transition did not render"; printf '%s\n' "$rendered" | sed 's/^/       /' | tail -8 ;;
+					esac
+					if [ -n "$(hashOf "$from")" ] && [ "$(hashOf "$from")" != "$(hashOf "$to")" ] \
+					   && [ "$(hashOf "$rendered")" != "$(hashOf "$from")" ] && [ "$(hashOf "$rendered")" != "$(hashOf "$to")" ]; then
+						pass "Transition 0, 0.5 and 1 are three different pictures"
+					else
+						fail "Transition 0, 0.5 and 1 did not give three different pictures"
+					fi
+					;;
+				*)
+					printf '   skipped: %s hosts the Filter context only -- the Transition is described, not rendered\n' "$OFXPROBE"
+					;;
+			esac
+		fi
+		rm -rf "$tmp"
 	fi
 fi
 

@@ -3,8 +3,10 @@ name: ci
 # Both platforms on every push and pull request, so a Dependabot bump has a
 # status check to gate on and a GLEW-shaped break -- which macOS is
 # structurally blind to, because macOS never links GLEW -- is caught before a
-# tag. There is no Linux job: the CMakeLists branches on APPLE and WIN32, and
-# Resolume has no Linux build.
+# tag. Both build the OpenFX plugin as well as the FFGL one (BUILD_OFX is on by
+# default). There is no Linux job here: Resolume has no Linux build, and the
+# OpenFX plugin's Linux build and its Rocky 8 load test are release.yml's
+# linux-ofx and linux-load, which a workflow_dispatch of release.yml runs.
 on:
   push:
     branches: [main]
@@ -48,8 +50,28 @@ jobs:
         # renderer's uv is good to 1 part in 10^5"). tools/verify.sh runs
         # the same suites on the same renderer locally, with
         # WPTEST_RENDERER=software, so a check that would fail here fails
-        # there first.
+        # there first. --cpu is among them: the OpenFX build's C++ copy of
+        # the wipe shader against the GLSL, pixel for pixel.
         run: ctest --test-dir build --output-on-failure
+
+      - name: The OpenFX bundle
+        # Built, exports its entry point, and its plist names the binary on
+        # disk -- checked by the exact codesign the release job runs, which
+        # is the only thing that notices a CFBundleExecutable copied from
+        # another plugin. Captured and matched with `case`, not piped into
+        # grep -q: under `bash -eo pipefail` a grep that FINDS its match
+        # SIGPIPEs the writer and fails the step.
+        shell: bash
+        run: |
+          bin="build/Wipe.ofx.bundle/Contents/MacOS/Wipe.ofx"
+          test -f "$bin"
+          __symbols=$( nm -gU "$bin" )
+          case "$__symbols" in
+            *_OfxGetPlugin*) ;;
+            *) echo "expected _OfxGetPlugin"; exit 1 ;;
+          esac
+          cp -R build/Wipe.ofx.bundle "$RUNNER_TEMP/"
+          codesign --force --sign - --timestamp=none "$RUNNER_TEMP/Wipe.ofx.bundle"
 
       - name: Controls
         # At 320x180, because the runner has no GPU and the question is only
@@ -68,6 +90,12 @@ jobs:
         with:
           name: wipe-macos-arm64
           path: build/*.bundle
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wipe-ofx-macos-arm64
+          path: build/Wipe.ofx.bundle
           if-no-files-found: error
 
   windows:
@@ -95,4 +123,14 @@ jobs:
         with:
           name: wipe-windows-x86_64
           path: build/Release/*.dll
+          if-no-files-found: error
+
+      # The OpenFX build's Win64 binary. MSVC is where the OFX target's output
+      # directories have to be pinned per configuration, and where its import
+      # library would race the FFGL target's (LNK1104) -- see CMakeLists.txt.
+      # A missing file here fails the job rather than a release.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wipe-ofx-windows-x86_64
+          path: build/Wipe.ofx.bundle/Contents/Win64/Wipe.ofx
           if-no-files-found: error
