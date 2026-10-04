@@ -35,15 +35,16 @@ the offline harness, not captured from Resolume.</sub>
 
 ## Download
 
-**[v0.1.0](https://github.com/stoatworks-labs/wipe/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+**[v0.2.0](https://github.com/stoatworks-labs/wipe/releases/tag/v0.2.0)** — prebuilt for macOS, Windows and Linux. Pick your platform:
 
 <details>
 <summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
 
 | Build | Download | Size |
 | --- | --- | --- |
-| Universal (Apple Silicon + Intel) · .dmg disk image | [`wipe-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/wipe/releases/download/v0.1.0/wipe-0.1.0-macos-universal.dmg) | 212 KB |
-| Universal (Apple Silicon + Intel) · .zip archive | [`wipe-macos-universal.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-macos-universal.zip) | 176 KB |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`wipe-0.2.0-macos-universal.dmg`](https://github.com/stoatworks-labs/wipe/releases/download/v0.2.0/wipe-0.2.0-macos-universal.dmg) | 220 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`wipe-macos-universal.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-macos-universal.zip) | 178 KB |
+| Universal (Apple Silicon + Intel) · .zip archive (OpenFX — Resolve, Vegas, Nuke) | [`wipe-ofx-macos-universal.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-ofx-macos-universal.zip) | 258 KB |
 
 </details>
 
@@ -52,8 +53,18 @@ the offline harness, not captured from Resolume.</sub>
 
 | Build | Download | Size |
 | --- | --- | --- |
-| x64 · .exe installer | [`wipe-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/wipe/releases/download/v0.1.0/wipe-0.1.0-windows-x86_64-setup.exe) | 222 KB |
-| x64 · .zip archive | [`wipe-windows-x86_64.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-windows-x86_64.zip) | 113 KB |
+| x64 · .exe installer | [`wipe-0.2.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/wipe/releases/download/v0.2.0/wipe-0.2.0-windows-x86_64-setup.exe) | 226 KB |
+| x64 · .zip archive | [`wipe-windows-x86_64.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-windows-x86_64.zip) | 114 KB |
+| x64 · .zip archive (OpenFX — Resolve, Vegas, Nuke) | [`wipe-ofx-windows-x86_64.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-ofx-windows-x86_64.zip) | 77 KB |
+
+</details>
+
+<details>
+<summary><b>Linux</b> — x64</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| x64 · .zip archive (OpenFX — Resolve, Vegas, Nuke) | [`wipe-ofx-linux-x86_64.zip`](https://github.com/stoatworks-labs/wipe/releases/latest/download/wipe-ofx-linux-x86_64.zip) | 718 KB |
 
 </details>
 
