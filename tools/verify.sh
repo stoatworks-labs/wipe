@@ -425,10 +425,11 @@ if [ "$(uname)" = "Darwin" ]; then
 						fail "Transition 0, 0.5 and 1 did not give three different pictures"
 					fi
 
-					# Resolve's Fusion page provides NO frame rate, on the effect
-					# or on any clip (measured in Resolve 21.1), and a getter that
+					# Resolve's Fusion page provides NO frame rate on any clip, only
+					# on the effect (measured in Resolve 21.1), and a getter that
 					# throws out of render fails the whole comp. A probe with
-					# --quirks fusion hosts exactly that. The General context is
+					# --quirks fusion is stricter than Fusion: it withholds the
+					# effect's rate too, so no rate is left. The General context is
 					# the one Fusion uses; the Transition context is where the
 					# probe can feed both inputs, so that is where the picture is
 					# checked: with no rate, Mod Speed must fall back to 24 fps --
@@ -439,8 +440,8 @@ if [ "$(uname)" = "Darwin" ]; then
 							general=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context general \
 							          --quirks fusion --size 320x180 --transition 0.5 --time 5 $mod 2>&1)
 							case "$general" in
-								*"rendered 320x180"*) pass "General context renders with Fusion's missing frame rate (--quirks fusion)" ;;
-								*) fail "the General context fails without a frame rate, as Fusion presents it"; printf '%s\n' "$general" | sed 's/^/       /' | tail -4 ;;
+								*"rendered 320x180"*) pass "General context renders with no frame rate (--quirks fusion)" ;;
+								*) fail "the General context fails without a frame rate (--quirks fusion)"; printf '%s\n' "$general" | sed 's/^/       /' | tail -4 ;;
 							esac
 							quirk=$("$OFXPROBE" $isolate --dir "$only" --render com.stoatworks.wipe --context transition \
 							        --quirks fusion --size 320x180 --transition 0.5 --time 5 $mod 2>&1)
@@ -457,7 +458,7 @@ if [ "$(uname)" = "Darwin" ]; then
 							fi
 							;;
 						*)
-							printf '   skipped: %s has no --quirks -- Fusion'"'"'s missing frame rate is unchecked\n' "$OFXPROBE"
+							printf '   skipped: %s has no --quirks -- the no-frame-rate case is unchecked\n' "$OFXPROBE"
 							;;
 					esac
 					;;

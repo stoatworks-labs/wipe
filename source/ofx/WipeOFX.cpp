@@ -50,9 +50,10 @@
 /// with seconds the frame's time over the clip's frame rate, so any frame
 /// renders on its own and scrubbing shows the wobble where it would be. The
 /// FFGL build's phase runs from the first frame it drew instead -- the only
-/// clock a mixer in a live host has. Resolve's Fusion page reports no frame
-/// rate at all, so there it assumes 24 fps (see framesPerSecond): a host
-/// property that is missing must never escape a render.
+/// clock a mixer in a live host has. Resolve's Fusion page reports the frame
+/// rate on the effect but not on its clips, so there it reads the effect's,
+/// and it assumes 24 fps only where a host reports none (see framesPerSecond):
+/// a host property that is missing must never escape a render.
 ///
 /// **The Area law is solved every frame.** The FFGL plugin caches the solve
 /// between frames, which is mutable state across renders; here it is not
@@ -115,12 +116,14 @@ constexpr const char* kPluginDescription =
 	"Not here, by design: Flip-Flop. In Resolume it remembers which end the fader "
 	"last rested at and reverses every other wipe; a transition in a timeline has "
 	"no previous one to remember, so use Reverse. The modulator's travel follows "
-	"the timeline, so every frame renders on its own. Fusion reports no frame "
-	"rate; there, Mod Speed assumes 24 fps.\n\n"
+	"the timeline, so every frame renders on its own. Resolve's Fusion page "
+	"reports the frame rate on the effect but not on its clips; Mod Speed reads "
+	"the effect's, and assumes 24 fps only where a host reports none.\n\n"
 	"https://stoatworks-labs.com";
 
 /// The frame rate when no host property supplies one: Resolve's default
-/// timeline rate. Resolve's Fusion page reports none -- see framesPerSecond.
+/// timeline rate. Resolve's Fusion page reports one on the effect, though not
+/// on its clips -- see framesPerSecond.
 constexpr double kFallbackFps = 24.0;
 
 constexpr const char* kParamTransition     = kOfxImageEffectTransitionParamName;
@@ -522,13 +525,14 @@ private:
 	/// The frame rate: the output clip's, else either input's, else the
 	/// effect's -- the first positive, finite answer -- else kFallbackFps.
 	///
-	/// EVERY read is caught. Resolve's Fusion page (21.1, measured by the lead
-	/// 2026-10-03) provides no frame rate at all, on the effect or on any clip,
-	/// and the Support library turns the missing property into an exception
-	/// that escapes `render` as kOfxStatErrMissingHostFeature: Fusion reports
-	/// the composition "could not be processed" and draws nothing. The Edit
-	/// page does provide one. Only Mod Speed reads the clock, so a missing rate
-	/// costs the modulator its speed in real seconds, never the frame.
+	/// EVERY read is caught. Resolve's Fusion page (21.1, measured 2026-10-04)
+	/// provides no frame rate on any clip, only on the effect, where it follows
+	/// the timeline. The Support library turns the missing property into an
+	/// exception that escapes `render` as kOfxStatErrMissingHostFeature: the
+	/// first build read a clip's, and Fusion reported the composition "could
+	/// not be processed" and drew nothing (the lead, 2026-10-03). The Edit page
+	/// does provide one. Only Mod Speed reads the clock, so a missing rate costs
+	/// the modulator its speed in real seconds, never the frame.
 	double framesPerSecond() const
 	{
 		const auto positive = []( auto read ) {

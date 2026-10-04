@@ -379,8 +379,9 @@ an effect with two inputs, SourceFrom and SourceTo. Wire both, and keyframe
   run a transition backwards.
 - **The wobble follows the timeline.** Mod Speed moves the modulator by the
   time of the frame, so scrubbing shows it where playback will, and a render
-  is the same every time. Fusion reports no frame rate; there, Mod Speed
-  assumes 24 fps.
+  is the same every time. Resolve's Fusion page reports the frame rate on the
+  effect but not on its clips; Mod Speed reads the effect's, and assumes
+  24 fps only where a host reports none.
 - **Sizes in pixels are full-resolution pixels.** A proxy or half-resolution
   preview draws them half as wide, so it looks the same. On an anamorphic
   format, Aspect Comp keeps a circle round as displayed.
@@ -423,7 +424,8 @@ at 1080p on an Apple M4 Max with eight threads.
 - **No Size control**, and no presets.
 - **The OpenFX build has been tried only in DaVinci Resolve's Edit page.** See
   [OpenFX](#openfx-resolve-vegas-nuke-and-natron). It has no Flip-Flop, by
-  design, and in Fusion, which reports no frame rate, Mod Speed assumes 24 fps.
+  design, and in a host that reports no frame rate Mod Speed assumes 24 fps
+  (Resolve's Fusion page reports one on the effect, and Wipe reads it).
 - **There is a browser demo** at [wipe-demo.stoatworks-labs.com](https://wipe-demo.stoatworks-labs.com).
   It is a port to a web page, not the plugin: the shaders run in WebGL2 and any CPU
   half is rewritten in JavaScript. The page lists what it does not reproduce.

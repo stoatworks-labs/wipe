@@ -715,11 +715,11 @@ multi-threaded `OFX::ImageProcessor`.
 
 - **A host property that is missing must never escape a render.** The Support
   library's getters throw when a host lacks a property, and an exception out of
-  `render` is a failed frame. Resolve's Fusion page has no frame rate anywhere,
-  and the first build -- whose fps read was guarded against zero but not
-  against absence -- failed every Fusion render while working on the Edit
-  page. Every clip-property read in WipeOFX.cpp is now inside a catch with a
-  stated default.
+  `render` is a failed frame. Resolve's Fusion page has no frame rate on its
+  clips, only on the effect, and the first build -- whose clip fps read was
+  guarded against zero but not against absence -- failed every Fusion render
+  while working on the Edit page. Every clip-property read in WipeOFX.cpp is
+  now inside a catch with a stated default.
 - **Apple's software renderer's `sin` is 1.1e-3 off** over the modulator's
   arguments (the GPU's: 1.1e-7). GLSL sets no precision for sin at all, so a
   hard, modulated edge lands 12–16 pixels differently there than on the GPU —
@@ -748,28 +748,31 @@ lead, 2026-10-03):
   lead with the Fusion fix below in (35dea77): the same clip order, linear
   progress, and the exact clips outside the transition.
 - **Fusion page, as a tool (the General context): the first build FAILED.**
-  Resolve's Fusion page provides no frame rate at all -- not on the effect,
-  not on any clip -- and reports FrameRange [0, 0], with the Unmapped pair and
-  the two render-status properties absent. The Support library threw
+  Resolve's Fusion page provides no frame rate on its clips (SourceFrom,
+  SourceTo, Output) and leaves out their Unmapped pair and the two
+  render-status properties; the effect does carry a frame rate, which follows
+  the timeline (24 in a 24 fps project, 25 in a 25 fps one; a property dump,
+  2026-10-04). The first build read a clip's: the Support library threw
   `PropertyUnknownToHost: OfxImageEffectPropFrameRate` out of `render` as
   kOfxStatErrMissingHostFeature, and Fusion reported that the composition
-  "could not be processed". **Fixed:** `framesPerSecond()` catches every read
-  and falls back to 24; `isConnected`, the premultiplication and the
-  components are read inside a catch too. Nothing here reads FrameRange, the
-  Unmapped pair or the render statuses, and no temporal fetch exists to clamp.
-  **Checked under the test host's `--quirks fusion`**, which removes the frame
-  rate from the effect and every clip, sets clip FrameRange to [0, 0] and drops
-  the Unmapped pair and the render statuses, as Fusion does (2026-10-04): the
-  first build (cc39f44) fails there, General context and Transition context
-  alike, with `kOfxStatErrMissingHostFeature` -- the failure Fusion showed --
-  and this one renders. The probe feeds Wipe's two named clips only in the
-  Transition context, so the picture is compared there: under the quirk,
-  Vertical ×3 modulated at frame 5 is **byte-identical** to the same render
-  from a host reporting 24 fps and differs from 25 fps; in the General context
-  (inputs unconnected) the quirk render is byte-identical to the 24 fps one too.
-  Every normal-host result above is unchanged to the hash. verify.sh runs the
-  quirk renders when OFXPROBE has `--quirks`. **Not yet re-run in Fusion
-  itself.**
+  "could not be processed". **Fixed:** `framesPerSecond()` catches every read,
+  so in Fusion it reaches the effect's rate, and falls back to 24 only where
+  neither a clip nor the effect reports one; `isConnected`, the
+  premultiplication and the components are read inside a catch too. Nothing
+  here reads FrameRange, the Unmapped pair or the render statuses, and no
+  temporal fetch exists to clamp. **Checked under the test host's
+  `--quirks fusion`**, which is stricter than Fusion: it removes the frame rate
+  from the effect as well as every clip, sets clip FrameRange to [0, 0] and
+  drops the Unmapped pair and the render statuses (2026-10-04). The first build
+  (cc39f44) fails there, General context and Transition context alike, with
+  `kOfxStatErrMissingHostFeature` -- the failure Fusion showed -- and this one
+  renders. The probe feeds Wipe's two named clips only in the Transition
+  context, so the picture is compared there: under the quirk, Vertical ×3
+  modulated at frame 5 is **byte-identical** to the same render from a host
+  reporting 24 fps and differs from 25 fps; in the General context (inputs
+  unconnected) the quirk render is byte-identical to the 24 fps one too. Every
+  normal-host result above is unchanged to the hash. verify.sh runs the quirk
+  renders when OFXPROBE has `--quirks`. **Not yet re-run in Fusion itself.**
 
 **Not verified:** Vegas, Nuke, Natron. How Resolve's own transition controls
 (ratio, reverse, ease) reach `Transition` beyond the default linear one. The
