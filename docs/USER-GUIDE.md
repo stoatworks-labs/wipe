@@ -17,8 +17,9 @@ what that comparator does.
 edge, a gold border and the modulator on. This was rendered by the offline
 harness, not captured from Resolume.*
 
-> **Before you rely on this:** released at **v0.1.0**, and honestly early. The
-> pattern generator is measured, not just asserted. An offline harness drives the
+> **Before you rely on this:** released at **v0.2.0**, which adds the OpenFX
+> build (a transition for DaVinci Resolve, Vegas, Nuke and Natron), and
+> honestly early. The pattern generator is measured, not just asserted. An offline harness drives the
 > real plugin with two inputs at two different sizes. A hard edge lands on its
 > column with **0 pixels wrong**. A soft edge's position integrates to
 > **0.0000 px** of where the fader puts it. In Area law every pattern's revealed
@@ -41,9 +42,10 @@ harness, not captured from Resolume.*
 
 Download the build for your platform. For macOS there is a universal `.dmg` or
 `.zip` (Apple silicon and Intel), **Developer ID-signed and notarised** so the bundle
-simply loads, and for Windows an x64 installer or `.zip`. Every download
-carries one mixer, **SW Wipe**. Put it in Resolume's FFGL folder, then restart
-Resolume:
+simply loads, and for Windows an x64 installer or `.zip`. Each of these
+carries one mixer, **SW Wipe** (the `wipe-ofx-` zips are the OpenFX build; see
+[OpenFX](#openfx-resolve-vegas-nuke-and-natron)). Put it in Resolume's FFGL
+folder, then restart Resolume:
 
 ```
 macOS    ~/Documents/Resolume Arena/Extra Effects/
@@ -348,7 +350,7 @@ in the **Stoatworks** group. Every control in this guide is there under the
 same name and with the same range and default, except the ones listed below.
 
 **Installing.** Download the `wipe-ofx-` zip for your platform (macOS universal,
-Windows x64 or Linux x86_64; from the release after v0.1.0) and copy
+Windows x64 or Linux x86_64; released from v0.2.0 on) and copy
 `Wipe.ofx.bundle` into the system OpenFX folder, then restart the host:
 
 ```

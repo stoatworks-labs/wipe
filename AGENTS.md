@@ -5,7 +5,8 @@ wipes the way a 1970s vision mixer did: from waveforms and a comparator, not
 from pictures. C++17 + GLSL 4.10, CMake, universal macOS `.bundle` and a
 Windows `.dll`; and the same wipe as an OpenFX **transition**
 (`Wipe.ofx.bundle`, macOS/Windows/Linux, CPU render) — see "The OpenFX build"
-below. MIT. Home `github.com/stoatworks-labs/wipe`, released v0.1.0.
+below. MIT. Home `github.com/stoatworks-labs/wipe`, released v0.1.0
+(2026-09-23); v0.2.0 adds the OpenFX build.
 genlock, the fleet's first mixer, was measured in Arena 7.27.1 (Windows,
 2026-09-23), and this build was corrected to what that session measured; Wipe
 itself was then probed in the same Arena the same day — see "What genlock
@@ -471,9 +472,11 @@ plugin builds were loading the CPU. Take the ceiling.
   hidden index 0 are measured on Wipe. Still inferred from genlock only: that
   both inputs arrive padded and that the modulator travels on Arena's
   millisecond clock. No mixer's picture has been looked at inside Resolume.
-- **The checks have not all held on another rasteriser.** The tolerances are
+- **The checks have held on one other rasteriser only.** The tolerances are
   derived and the "would this hold" list above is argued. On CI's GPU-less
-  macOS runner eight suites pass and `--area` fails at 640×360 (see that list);
+  macOS runner every suite passes, once `--area` allowed for the GL spec's
+  1 part in 10^5 (see the trap "The software renderer's `uv` is good to
+  1 part in 10^5");
   the harness has never run on llvmpipe. The Windows DLL compiles with MSVC in
   CI, and ran in Arena only for the probe above.
 - **Premultiplied alpha is assumed.** `mix( a, b, key )` on whatever the host
@@ -741,7 +744,9 @@ lead, 2026-10-03):
   so the spec's order is the order Resolve feeds. Progress is linear across
   24 frames, and Resolve sends **Transition ≈ (n + 0.5)/24** -- the middle of
   each frame, never exactly 0 or 1 -- so inside a Resolve transition
-  `isIdentity` never fires and every frame is rendered.
+  `isIdentity` never fires and every frame is rendered. Re-confirmed by the
+  lead with the Fusion fix below in (35dea77): the same clip order, linear
+  progress, and the exact clips outside the transition.
 - **Fusion page, as a tool (the General context): the first build FAILED.**
   Resolve's Fusion page provides no frame rate at all -- not on the effect,
   not on any clip -- and reports FrameRange [0, 0], with the Unmapped pair and

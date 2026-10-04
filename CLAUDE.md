@@ -3,8 +3,10 @@
 A vision mixer's analogue pattern generator as an FFGL **mixer** for Resolume
 Arena/Avenue, and as an OpenFX **transition** for Resolve/Vegas/Nuke/Natron
 (`source/ofx/WipeOFX.cpp`). C++/GLSL, CMake MODULE → universal `.bundle`
-(macOS) + Windows `.dll`, and `Wipe.ofx.bundle` for macOS/Windows/Linux. MIT. Not yet public, not yet released, never itself loaded into
-Resolume (genlock, the first mixer, has been).
+(macOS) + Windows `.dll`, and `Wipe.ofx.bundle` for macOS/Windows/Linux. MIT.
+Public; released at v0.1.0 (2026-09-23), and v0.2.0 adds the OpenFX build.
+Never loaded into Resolume on macOS; on Windows it was probed by hand in Arena
+(see "Not done yet"), after genlock, the first mixer, was measured there.
 
 Read `AGENTS.md` before changing the waveforms, the level laws, or any
 tolerance in the harness. Read `~/dev/genlock/AGENTS.md` (the fleet's account
@@ -153,14 +155,14 @@ Every check runs at 640x360 and 320x180 and carries its own negative control.
   parameter hidden. No mixer frame was captured, so a correct render in
   Resolume is not claimed. Padded inputs and `SetTime` in ms were measured on
   genlock only; transition/autopilot on `Opacity` and a one-input call are open.
-- CI: the Windows DLL compiles with MSVC; the macOS job is red because
-  `--area` fails at 640×360 on four patterns on the GPU-less runner (see
-  AGENTS.md). The other eight suites pass there.
+- CI is green: the Windows DLL compiles with MSVC, and on the GPU-less macOS
+  runner every suite passes on Apple's software renderer since `--area`
+  allowed for the GL spec's 1 part in 10^5 (dd445f2; see AGENTS.md).
 - No `Size` control (dropped, see AGENTS.md), no presets.
 - **The OpenFX build has been in one real host**: Resolve 21.1's Edit page,
   as a transition, with the clip order and the progress right (the lead,
-  2026-10-03). Fusion provides no frame rate at all and the first build failed
-  there; `framesPerSecond()` now catches every read and falls back to 24 —
+  2026-10-03, and again after the Fusion fix). Fusion provides no frame rate
+  at all and the first build failed there; `framesPerSecond()` now catches every read and falls back to 24 —
   checked under the test host's `--quirks fusion`, not yet in Fusion. Never
   read a host property in a render path without a catch. Vegas, Nuke and
   Natron untried.

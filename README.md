@@ -161,8 +161,8 @@ conversions, and the wipe shader mirrored in C++ and tested against the GLSL
 pixel for pixel — rendered on the CPU across every core.
 
 The OpenFX zip for your platform (`wipe-ofx-macos-universal.zip`,
-`wipe-ofx-windows-x86_64.zip` or `wipe-ofx-linux-x86_64.zip`, from the next
-release on) holds `Wipe.ofx.bundle`. Copy it into the standard OpenFX folder,
+`wipe-ofx-windows-x86_64.zip` or `wipe-ofx-linux-x86_64.zip`, released from
+v0.2.0 on) holds `Wipe.ofx.bundle`. Copy it into the standard OpenFX folder,
 then restart the host:
 
 ```
@@ -217,9 +217,10 @@ keyframe `Transition` like any other control.
   first parameter.
 - Wipe has no audio path and no beat sync, so nothing else is missing.
 
-**In DaVinci Resolve 21.1** (Studio, macOS; checked by the lead, 2026-10-03) it
-works as an Edit-page transition: the frames before it are exactly the outgoing
-clip and the frames after it exactly the incoming one, and the progress is
+**In DaVinci Resolve 21.1** (Studio, macOS; checked by the lead, 2026-10-03,
+and again after the Fusion fix below) it works as an Edit-page transition: the
+frames before it are exactly the outgoing clip and the frames after it exactly
+the incoming one, and the progress is
 linear — Resolve sends Transition ≈ (n + 0.5)/24 across a 24-frame transition,
 never exactly 0 or 1. Its General context makes it a Fusion tool too, and
 Fusion provides no frame rate at all; the first build failed to render there
@@ -286,8 +287,10 @@ number and where it comes from.
 
 ## Status
 
-**v0.1.0, and honestly early.** Verified by measurement on an Apple
-M4 Max, macOS 26.4.1, 2026-09-23, at 640×360 **and** 320×180 unless stated:
+**v0.2.0, and honestly early.** v0.2.0 adds the OpenFX build; the Resolume
+build's output is unchanged. Verified by measurement on an Apple M4 Max, macOS
+26.4.1, 2026-09-23 (the OpenFX rows 2026-10-03 and 04), at 640×360 **and**
+320×180 unless stated:
 
 | Check | Result |
 | --- | --- |
@@ -352,9 +355,9 @@ Mac's**. The spec's `Size` control was dropped, for a stated reason.
 Area law with both Multiples high is the one setting whose CPU cost is worth
 knowing about. There are **no presets**. The OpenFX build has been in **one
 real host**, DaVinci Resolve 21.1 on macOS, as an Edit-page transition, where
-the clip order and the progress are right (checked by the lead); the Fusion
-fix is so far checked only against a test host that reproduces Fusion's
-missing frame rate, and Vegas, Nuke and Natron are untried. Its Windows and
+the clip order and the progress are right (checked by the lead, and again
+after the Fusion fix); the Fusion fix is so far checked only against a test
+host that reproduces Fusion's missing frame rate, and Vegas, Nuke and Natron are untried. Its Windows and
 Linux builds are compiled and (Linux) load-tested on Rocky 8 in CI, and have
 not rendered a frame. The
 [browser demo](https://wipe-demo.stoatworks-labs.com) is a port, not the plugin.
