@@ -55,10 +55,11 @@ of how an FFGL mixer behaves; the released copy with the Arena measurements is
 - Alternate transitions reverse: `./build/wptest --flipflop`
 - The OpenFX build's C++ shader IS the GLSL, pixel for pixel: `./build/wptest --cpu`
 - The OpenFX build's CPU cost at 1080p, 1 thread and all: `./build/wptest --cpu-bench`
-- The OFX bundle in a host: `ofxprobe --dir build` (the fleet's probe describes it
-  but hosts only the Filter context); a probe with `--context transition`
-  renders it — `OFXPROBE=/path/to/that/probe tools/verify.sh` makes verify.sh do so,
-  and if it also has `--quirks fusion` (no frame rate anywhere: stricter than
+- The OFX bundle in a host: `ofxprobe --dir build` (the fleet's probe, in
+  resolume-ofx-bridge, hosts the Transition context since its v0.10.0, so
+  `--context transition` renders it). verify.sh uses `../resolume-ofx-bridge/build/ofxprobe`
+  (`OFXPROBE=/path/to/probe` names another) and renders the Transition,
+  and since that probe also has `--quirks fusion` (no frame rate anywhere: stricter than
   Resolve's Fusion page, which leaves it off the clips but gives the effect's)
   verify.sh renders the General context that way and checks the modulator
   falls back to 24 fps
