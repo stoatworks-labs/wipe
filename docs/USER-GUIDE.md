@@ -394,8 +394,9 @@ an effect with two inputs, SourceFrom and SourceTo. Wire both, and keyframe
 - **Area law is worked out for every frame.** It costs a few milliseconds at
   most, for a Circle with both Multiples at 8.
 
-It renders on the CPU, on every core the host gives it: about 3 to 7 ms a frame
-at 1080p on an Apple M4 Max with eight threads.
+It renders on the CPU, on every core the host gives it: 2.8 to 6.4 ms a frame
+at 1080p on an Apple M4 Max with eight threads, and 7.8 ms for a Circle with both
+Multiples at 8 in Area law.
 
 > **Where it's been tried.** The OpenFX build has been checked against the
 > Resolume build pixel for pixel, and rendered through a test host's
