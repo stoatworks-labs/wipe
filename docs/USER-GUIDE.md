@@ -1,26 +1,27 @@
 # Wipe user guide
 
 Wipe is **a 1970s vision mixer's pattern generator**, as an FFGL **mixer** for
-[Resolume](https://resolume.com) Arena and Avenue, and as an OpenFX
+[Resolume](https://resolume.com) Arena and Avenue and as an OpenFX
 **transition** for DaVinci Resolve, Vegas, Nuke and Natron (see
 [OpenFX](#openfx-resolve-vegas-nuke-and-natron)). In Resolume it wipes this layer
-in over the layer below; as a transition, the next clip in over the last. Either
-way it makes every wipe the way the hardware did: not from a stored
-picture of a shape, but from a few waveforms (a horizontal ramp, a vertical ramp
+in over the layer below, and as a transition it wipes the next clip in over the last.
+
+Either way, it makes every wipe the way the hardware did. There's no stored
+picture of a shape, just a few waveforms (a horizontal ramp, a vertical ramp
 and their parabolas) compared against the fader. Soft edges, borders, the wobble
-of the modulator and the way a circle's edge is softer near its middle are all
-what that comparator does.
+of the modulator and the way a circle's edge is softer near its middle all come
+from what that comparator does.
 
 ![A soft circle wipe with a modulated border, revealing one test card over another](hero.png)
 
 *The repo's two test cards through the plugin: a Circle at Opacity 0.42 with a soft
-edge, a gold border and the modulator on. This was rendered by the offline
-harness, not captured from Resolume.*
+edge, a gold border and the modulator on. Rendered by the offline harness
+rather than captured from Resolume.*
 
 > **Before you rely on this:** released at **v0.2.0**, which adds the OpenFX
 > build (a transition for DaVinci Resolve, Vegas, Nuke and Natron), and
-> honestly early. The pattern generator is measured, not just asserted. An offline harness drives the
-> real plugin with two inputs at two different sizes. A hard edge lands on its
+> still early days. The pattern generator is measured, not just asserted. An offline harness
+> drives the plugin itself with two inputs at two different sizes. A hard edge lands on its
 > column with **0 pixels wrong**. A soft edge's position integrates to
 > **0.0000 px** of where the fader puts it. In Area law every pattern's revealed
 > area is within **0.33 px** of the fader. A circle's soft edge widens towards its
@@ -28,10 +29,13 @@ harness, not captured from Resolume.*
 > predicted). The modulator's sine comes back at **16.0000 px** of 16. All 21
 > controls the harness can sweep change the picture.
 > It has **never been loaded into Resolume on macOS**.
-> On Windows, a build of v0.1.0 loads in Resolume Arena 7.27.1, is offered as a layer's Blend Mode, is driven by the layer's opacity fader and hides only Aspect Comp, as designed — on software rendering, and no picture of it inside Resolume has been captured, so a correct render there is not yet shown.
+> On Windows, a build of v0.1.0 loads in Resolume Arena 7.27.1, is offered as a layer's Blend
+> Mode, is driven by the layer's opacity fader and hides only Aspect Comp, as designed. That was
+> on software rendering, and nobody has captured a picture of it inside Resolume, so it hasn't
+> been shown to render correctly there yet.
 > The rest of what it assumes about how Resolume treats a mixer was measured on
 > Genlock, the fleet's first mixer.
-> **Try it on a spare layer first**, and please report anything that misbehaves.
+> **Try it on a spare layer first**, and please tell me about anything that misbehaves.
 >
 > This codebase was created with AI assistance, directed and reviewed by a human
 > author.
@@ -40,10 +44,10 @@ harness, not captured from Resolume.*
 
 ## Installing
 
-Download the build for your platform. For macOS there is a universal `.dmg` or
+Download the build for your platform. For macOS there's a universal `.dmg` or
 `.zip` (Apple silicon and Intel), **Developer ID-signed and notarised** so the bundle
-simply loads, and for Windows an x64 installer or `.zip`. Each of these
-carries one mixer, **SW Wipe** (the `wipe-ofx-` zips are the OpenFX build; see
+just loads, and for Windows an x64 installer or `.zip`. Each of these
+has one mixer in it, **SW Wipe** (the `wipe-ofx-` zips are the OpenFX build; see
 [OpenFX](#openfx-resolve-vegas-nuke-and-natron)). Put it in Resolume's FFGL
 folder, then restart Resolume:
 
@@ -52,16 +56,16 @@ macOS    ~/Documents/Resolume Arena/Extra Effects/
 Windows  %USERPROFILE%\Documents\Resolume Arena\Extra Effects\
 ```
 
-Avenue uses the same layout in its own folder. It really is **Extra Effects**,
+Avenue uses the same layout in its own folder. Yes, it's **Extra Effects**,
 even though this is a mixer: Resolume has one FFGL plugin folder, and sources,
-effects and mixers all load from it. There is no `Extra Mixers`.
+effects and mixers all load from it. There's no `Extra Mixers`.
 
-A mixer does not appear in the effects browser. In Resolume it appears in a
+A mixer doesn't appear in the effects browser. In Resolume it appears in a
 layer's **Blend Mode** list, beside Resolume's own blend modes (the same list
 Resolume uses for transitions). Choose **SW Wipe** as the blend mode of the upper
 layer.
 
-The Windows builds are not code-signed. Plugin files are not gated the way `.exe`
+The Windows builds aren't code-signed. Plugin files aren't gated the way `.exe`
 files are, so Resolume loads them as normal; only the installer trips SmartScreen,
 once: **More info** → **Run anyway**.
 
@@ -77,10 +81,10 @@ An effect gets one picture. A mixer gets two, and Wipe needs both:
 | **B** | this layer | What you wipe *in*. Shown in full at Opacity 1. |
 
 To patch it, put one clip on a layer and the clip you want to wipe in on the layer
-**above** it. Then set the upper layer's **Blend Mode** to SW Wipe. Handed only
-one picture, the plugin declines to draw.
+**above** it. Then set the upper layer's **Blend Mode** to SW Wipe. Give it only
+one picture and the plugin won't draw anything.
 
-The two layers do not have to be the same size. Each input is read at its own
+The two layers don't have to be the same size. Each input is read at its own
 resolution, and every distance below is in pixels of the output picture.
 
 ---
@@ -101,7 +105,7 @@ travels to the right. Then, in this order:
 1. **Pattern.** Try **Box** and **Circle**, which open from the centre, and
    **Clock**, which sweeps round from twelve.
 2. **Softness.** Give the edge 16 pixels or so. On a Circle, notice the edge is
-   softer when the circle is small than when it is large. That is not a bug.
+   softer when the circle is small than when it's large. That's not a bug.
 3. **Border Width**, and the border colour. A second edge in a solid colour.
 4. **Mod Amount.** The edge starts to wobble, and the wobble travels.
 
@@ -115,11 +119,11 @@ drawn in the unit square and stretched to the picture, so on a 16:9 composition 
 circle is an ellipse and a box is a rectangle, which is what an uncompensated
 generator actually drew.
 
-> **In Resolume this control is missing, and that is deliberate.** Resolume Arena
-> does not show a mixer's first parameter at all (measured on Genlock, whose first
+> **In Resolume this control is missing, on purpose.** Resolume Arena
+> doesn't show a mixer's first parameter at all (measured on Genlock, whose first
 > control vanished from the panel). So Wipe puts Aspect Comp first, because its
 > default is the right setting if it can never be changed: in Resolume, circles
-> are always round and the ellipse cannot be reached. In Arena 7.27.1 on Windows,
+> are always round and the ellipse can't be reached. In Arena 7.27.1 on Windows,
 > Wipe's panel shows every control except Aspect Comp, so this works as intended.
 
 **Pattern**: the shape of the wipe. The default is **Horizontal**.
@@ -145,11 +149,11 @@ anticlockwise from twelve.
 
 **Flip-Flop**: reverses the pattern on alternate transitions. A transition is the
 fader arriving at one end from the other. With Flip-Flop on, the direction flips
-each time one completes, so on the way back the wipe does not run backwards: each
-new picture arrives the same way as the last. Whether that is "from the centre" or
-"from the edges" depends on which end the fader was resting at first. If it is the
+each time one completes, so on the way back the wipe doesn't run backwards: each
+new picture arrives the same way as the last. Whether that's "from the centre" or
+"from the edges" depends on which end the fader was resting at first. If it's the
 wrong one, toggle **Reverse**. The first arrival at an end after the plugin is
-created does not count, and turning Flip-Flop off clears it.
+created doesn't count, and turning Flip-Flop off clears it.
 
 ---
 
@@ -160,7 +164,7 @@ default is 0.5, but **in Resolume this is driven by the layer's opacity fader**,
 and the Opacity slider in the mixer's own panel is overridden: moving it or
 automating it does nothing. Use the layer's fader. (Measured on Genlock and on
 Wipe in Arena 7.27.1 on Windows. Whether a layer transition or the autopilot also
-moves it has not been tried.)
+moves it hasn't been tried.)
 
 At exactly 0 and exactly 1 the output is the untouched picture, bit for bit: no
 soft edge, border or wobble can leak into an end stop.
@@ -168,8 +172,8 @@ soft edge, border or wobble can leak into an end stop.
 **Law**: how the fader's position becomes the size of the wipe.
 
 - **Edge**, the default, is what the hardware did: the comparator's level moves
-  in a straight line with the fader. On a Horizontal wipe that is the same as
-  the revealed area, but on the shapes that grow from the centre it is not:
+  in a straight line with the fader. On a Horizontal wipe that's the same as
+  the revealed area, but on the shapes that grow from the centre it isn't:
   at half way an edge-law Box has revealed about 44% of a 16:9 picture.
 - **Area** chooses the level so the **area of B on screen is exactly the fader**,
   for every pattern, soft edge included. At half way, half the picture is B,
@@ -229,7 +233,7 @@ angled wipe.
 **Aspect**: the pattern's own width against its height, from 0.25 to 4 on a
 geometric scale. The middle of the slider (the default) is 1. Towards the top the
 pattern gets narrower, so a Box becomes a tall rectangle; towards the bottom it
-gets wider. It does not affect the Matrix, and on a Horizontal or Vertical wipe it
+gets wider. It doesn't affect the Matrix, and on a Horizontal or Vertical wipe it
 only changes anything once the wipe is rotated.
 
 ---
@@ -257,7 +261,7 @@ the picture. Multiple H counts copies across one picture *height's* worth of
 width whenever Aspect Comp is on (the default, and the only setting Resolume can
 reach), because the horizontal ramp is scaled for the picture's shape before it
 wraps: that keeps the cells square, so on a 16:9 picture Multiple H of 4 gives
-about seven copies across. With Aspect Comp off it is exactly N across, and a
+about seven copies across. With Aspect Comp off it's exactly N across, and a
 circle's cells are stretched with the picture. A Horizontal wipe uses Multiple H only
 and a Vertical wipe Multiple V only; a Box, Diamond or Circle is repeated in a
 grid, each copy opening in its own cell; a Clock with Multiple H of N sweeps N
@@ -267,17 +271,17 @@ sectors at once; the Matrix multiplies its 32 × 18 grid by both.
 
 ## How it works: a waveform and a comparator
 
-A vision mixer of the 1970s did not store its wipes. It ran a few analogue
+A vision mixer of the 1970s didn't store its wipes. It ran a few analogue
 waveform generators at line and field rate: a horizontal ramp, a vertical ramp,
 and the two parabolas. It combined them in a small matrix, adding them or taking
 the larger, and compared the result against the level set by the fader. Where the
 waveform was below the level you saw B; above it, A.
 
-Wipe does exactly that for every pixel, and everything else follows from it:
+Wipe does the same for every pixel, and everything else follows from that:
 
-- **Softness is the comparator's gain.** A low-gain comparator does not switch
+- **Softness is the comparator's gain.** A low-gain comparator doesn't switch
   cleanly, and the width of its soft edge on screen depends on how steep the
-  waveform is there. That is why a circle's edge is softer near its middle.
+  waveform is there. That's why a circle's edge is softer near its middle.
 - **The border is a second comparator**, set a little above the first. The border
   is where the two disagree, so its width follows the waveform's slope too.
 - **The modulator is a sine added to the waveform**, which is how the wobble
@@ -292,7 +296,7 @@ and does nothing else.
 
 ## Performance
 
-It is one pass with two texture reads. The worst figures from the offline harness
+It's one pass with two texture reads. The worst figures from the offline harness
 on an Apple M4 Max, on the Matrix pattern with softness, a border and the
 modulator all on (the most work per pixel), were:
 
@@ -307,7 +311,7 @@ At this size the measurement itself costs about as much as the work, so take the
 ceiling, not the average.
 
 **Area law** adds a calculation on the CPU, on the frames where the fader or a
-setting has changed. It is under 0.06 ms for any single pattern, but it grows with
+setting has changed. It's under 0.06 ms for any single pattern, but it grows with
 the Multiples: about 2.8 ms for a Box at Multiple 8 × 8 and 7.8 ms for a Circle on
 a quiet machine, and up to 16.9 ms for the Circle on a busy one. If a moving fader
 stutters with both Multiples high, use Edge law.
@@ -321,7 +325,7 @@ No timing has been taken inside Resolume.
 **Only one of the two pictures shows.** The fader is at an end. In Resolume the
 fader is the layer's opacity, not the Opacity slider in the mixer's panel.
 
-**Moving the Opacity slider does nothing.** That is Resolume overriding it with
+**Moving the Opacity slider does nothing.** That's Resolume overriding it with
 the layer's opacity fader. Use the layer's fader.
 
 **A control does nothing.** Some controls only act on some patterns: the
@@ -329,8 +333,8 @@ positioner on Box, Diamond, Circle and Clock; Border Softness and the border
 colour only with a Border Width; Mod Frequency and Mod Speed only with a Mod
 Amount.
 
-**The mixer does nothing at all.** A shader that fails to compile looks exactly
-like that. The plugin writes a small log:
+**The mixer does nothing at all.** That's what a shader that fails to compile
+looks like. The plugin writes a small log:
 
 ```
 macOS    ~/Library/Logs/wipe/wipe.YYYY-MM-DD.log
@@ -345,7 +349,7 @@ and an error line if the shader failed to compile.
 
 ## OpenFX: Resolve, Vegas, Nuke and Natron
 
-The OpenFX build is the same wipe as a **transition**. It is called **Wipe**,
+The OpenFX build is the same wipe as a **transition**. It's called **Wipe**,
 in the **Stoatworks** group. Every control in this guide is there under the
 same name and with the same range and default, except the ones listed below.
 
@@ -370,12 +374,12 @@ In a host without transitions (Nuke, Natron, or Resolve's Fusion page), Wipe is
 an effect with two inputs, SourceFrom and SourceTo. Wire both, and keyframe
 **Transition** from 0 to 1 yourself.
 
-**What is different:**
+**What's different:**
 
-- **There is no Flip-Flop.** It works by remembering the previous transition,
+- **There's no Flip-Flop.** It works by remembering the previous transition,
   and each transition in a timeline is separate. Use **Reverse** on the
   transitions you want to run the other way. Reverse mirrors the pattern, so a
-  Box closes instead of opening; it is not the same as a host's own option to
+  Box closes instead of opening; it isn't the same as a host's own option to
   run a transition backwards.
 - **The wobble follows the timeline.** Mod Speed moves the modulator by the
   time of the frame, so scrubbing shows it where playback will, and a render
@@ -393,28 +397,28 @@ an effect with two inputs, SourceFrom and SourceTo. Wire both, and keyframe
 It renders on the CPU, on every core the host gives it: about 3 to 7 ms a frame
 at 1080p on an Apple M4 Max with eight threads.
 
-> **Where it has been tried.** The OpenFX build has been checked against the
+> **Where it's been tried.** The OpenFX build has been checked against the
 > Resolume build pixel for pixel, and rendered through a test host's
 > transition, where it matches to within one level in 255. In **DaVinci Resolve
-> 21.1** it works as an Edit-page transition, the right way round. It has not
-> yet been tried in Resolve's Fusion page, Vegas, Nuke or Natron. If the wipe
+> 21.1** it works as an Edit-page transition, the right way round. It hasn't
+> been tried yet in Resolve's Fusion page, Vegas, Nuke or Natron. If the wipe
 > runs the wrong way round in your host (it starts on the incoming clip),
-> please report it.
+> please tell me.
 
 ---
 
 ## Known limits
 
-- **Aspect Comp is hidden in Resolume.** Arena does not show a mixer's first
-  parameter, so Wipe puts Aspect Comp there on purpose. In Resolume it is always
-  on: circles are round and the ellipse cannot be chosen. Checked with Wipe in
+- **Aspect Comp is hidden in Resolume.** Arena doesn't show a mixer's first
+  parameter, so Wipe puts Aspect Comp there on purpose. In Resolume it's always
+  on: circles are round and the ellipse can't be chosen. Checked with Wipe in
   Arena 7.27.1 on Windows.
 - **The fader is the layer's opacity.** In Resolume the mixer's own Opacity
-  slider is overridden by the layer's opacity fader, so it cannot be set or
-  automated separately. Whether a layer transition or the autopilot moves it has
-  not been tried on any mixer.
+  slider is overridden by the layer's opacity fader, so it can't be set or
+  automated separately. Whether a layer transition or the autopilot moves it
+  hasn't been tried on any mixer.
 - **Never loaded into Resolume on macOS.** In Resolume on Windows it has run only
-  on software rendering, and its picture there has not been captured. No graphics
+  on software rendering, and its picture there hasn't been captured. No graphics
   card but the Mac it was built on has run it.
 - **Sizes are in pixels**, so a 4K edge is half the share of the picture of a
   1080p one.
@@ -423,12 +427,12 @@ at 1080p on an Apple M4 Max with eight threads.
 - **Premultiplied alpha is assumed** for both pictures, and the border is opaque.
 - **No Size control**, and no presets.
 - **The OpenFX build has been tried only in DaVinci Resolve's Edit page.** See
-  [OpenFX](#openfx-resolve-vegas-nuke-and-natron). It has no Flip-Flop, by
-  design, and in a host that reports no frame rate Mod Speed assumes 24 fps
+  [OpenFX](#openfx-resolve-vegas-nuke-and-natron). It has no Flip-Flop, on
+  purpose, and in a host that reports no frame rate Mod Speed assumes 24 fps
   (Resolve's Fusion page reports one on the effect, and Wipe reads it).
 - **There is a browser demo** at [wipe-demo.stoatworks-labs.com](https://wipe-demo.stoatworks-labs.com).
-  It is a port to a web page, not the plugin: the shaders run in WebGL2 and any CPU
-  half is rewritten in JavaScript. The page lists what it does not reproduce.
+  It's a port to a web page rather than the plugin: the shaders run in WebGL2 and any
+  CPU half is rewritten in JavaScript. The page lists what it doesn't reproduce.
 
 ---
 
@@ -442,4 +446,4 @@ GitHub and the support page in your browser.
 
 [github.com/stoatworks-labs/wipe/issues](https://github.com/stoatworks-labs/wipe/issues).
 A screenshot, your Resolume version, the pattern and Law, the composition's
-resolution, and the day's log are usually enough.
+resolution, and the day's log are usually enough for me to go on.
